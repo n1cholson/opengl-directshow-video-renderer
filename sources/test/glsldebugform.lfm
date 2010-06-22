@@ -1,0 +1,29 @@
+object frmGLSLDebug: TfrmGLSLDebug
+  Left = 321
+  Height = 480
+  Top = 161
+  Width = 400
+  Caption = 'Debug infos:'
+  ClientHeight = 480
+  ClientWidth = 400
+  FormStyle = fsStayOnTop
+  LCLVersion = '0.9.28.2'
+  Visible = True
+  object memDebug: TMemo
+    Left = 0
+    Height = 480
+    Top = 0
+    Width = 400
+    Align = alClient
+    Font.CharSet = ANSI_CHARSET
+    Font.Height = -13
+    Font.Name = 'Courier New'
+    Font.Pitch = fpFixed
+    Font.Quality = fqDraft
+    ParentFont = False
+    ReadOnly = True
+    ScrollBars = ssBoth
+    TabOrder = 0
+    WordWrap = False
+  end
+end

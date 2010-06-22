@@ -1,0 +1,102 @@
+<?xml version="1.0"?>
+<CONFIG>
+  <ProjectOptions>
+    <PathDelim Value="\"/>
+    <Version Value="7"/>
+    <General>
+      <SessionStorage Value="InProjectDir"/>
+      <MainUnit Value="0"/>
+      <TargetFileExt Value=".exe"/>
+      <Icon Value="0"/>
+      <UseXPManifest Value="True"/>
+    </General>
+    <VersionInfo>
+      <ProjectVersion Value=""/>
+    </VersionInfo>
+    <PublishOptions>
+      <Version Value="2"/>
+      <IgnoreBinaries Value="False"/>
+      <IncludeFileFilter Value="*.(pas|pp|inc|lfm|lpr|lrs|lpi|lpk|sh|xml)"/>
+      <ExcludeFileFilter Value="*.(bak|ppu|ppw|o|so);*~;backup"/>
+    </PublishOptions>
+    <RunParams>
+      <local>
+        <FormatVersion Value="1"/>
+        <LaunchingApplication PathPlusParams="/usr/X11R6/bin/xterm -T 'Lazarus Run Output' -e $(LazarusDir)/tools/runwait.sh $(TargetCmdLine)"/>
+      </local>
+    </RunParams>
+    <RequiredPackages Count="1">
+      <Item1>
+        <PackageName Value="LCL"/>
+      </Item1>
+    </RequiredPackages>
+    <Units Count="9">
+      <Unit0>
+        <Filename Value="glrenderer.lpr"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="glrenderer"/>
+      </Unit0>
+      <Unit1>
+        <Filename Value="mainform.pas"/>
+        <IsPartOfProject Value="True"/>
+        <ComponentName Value="frmMain"/>
+        <ResourceBaseClass Value="Form"/>
+        <UnitName Value="mainform"/>
+      </Unit1>
+      <Unit2>
+        <Filename Value="dglOpenGL.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="dglOpenGL"/>
+      </Unit2>
+      <Unit3>
+        <Filename Value="conversion.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="conversion"/>
+      </Unit3>
+      <Unit4>
+        <Filename Value="dshowtypes.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="dshowtypes"/>
+      </Unit4>
+      <Unit5>
+        <Filename Value="sampleloader.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="sampleloader"/>
+      </Unit5>
+      <Unit6>
+        <Filename Value="texture.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="texture"/>
+      </Unit6>
+      <Unit7>
+        <Filename Value="glsl.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="glsl"/>
+      </Unit7>
+      <Unit8>
+        <Filename Value="glsldebugform.pas"/>
+        <IsPartOfProject Value="True"/>
+        <ComponentName Value="frmGLSLDebug"/>
+        <ResourceBaseClass Value="Form"/>
+        <UnitName Value="glsldebugform"/>
+      </Unit8>
+    </Units>
+  </ProjectOptions>
+  <CompilerOptions>
+    <Version Value="8"/>
+    <PathDelim Value="\"/>
+    <SearchPaths>
+      <IncludeFiles Value="$(ProjOutDir)\"/>
+    </SearchPaths>
+    <Linking>
+      <Options>
+        <Win32>
+          <GraphicApplication Value="True"/>
+        </Win32>
+      </Options>
+    </Linking>
+    <Other>
+      <CompilerPath Value="$(CompPath)"/>
+    </Other>
+  </CompilerOptions>
+</CONFIG>
