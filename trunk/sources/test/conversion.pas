@@ -74,10 +74,10 @@ var
     r := (1.164 * (y - 16)) + (2.018 * (v - 128));
     g := (1.164 * (y - 16)) - (0.813 * (u - 128)) - (0.391 * (v - 128));
     b := (1.164 * (y - 16)) + (1.596 * (u - 128));
-    PByte(UINT(Dst)+dstIdx+0)^ := CLIP(b);
-    PByte(UINT(Dst)+dstIdx+1)^ := CLIP(g);
-    PByte(UINT(Dst)+dstIdx+2)^ := CLIP(r);
-    PByte(UINT(Dst)+dstIdx+3)^ := 0;
+    PByte(UInt64(Dst)+dstIdx+0)^ := CLIP(b);
+    PByte(UInt64(Dst)+dstIdx+1)^ := CLIP(g);
+    PByte(UInt64(Dst)+dstIdx+2)^ := CLIP(r);
+    PByte(UInt64(Dst)+dstIdx+3)^ := 0;
   end;
 
   procedure YUV411ToRGB8888(u, v, y1, y2, y3, y4 : Byte);
@@ -103,10 +103,10 @@ var
     R := (ARGB555 shr 10) and $1F;
     G := (ARGB555 shr 5) and $1F;
     B := (ARGB555) and $1F;
-    PByte(UINT(Dst)+0)^ := (b shl 3) or (b shr 2);
-    PByte(UINT(Dst)+1)^ := (g shl 3) or (g shr 2);
-    PByte(UINT(Dst)+2)^ := (r shl 3) or (r shr 2);
-    PByte(UINT(Dst)+3)^ := 0;
+    PByte(UInt(Dst)+0)^ := (b shl 3) or (b shr 2);
+    PByte(UInt(Dst)+1)^ := (g shl 3) or (g shr 2);
+    PByte(UInt(Dst)+2)^ := (r shl 3) or (r shr 2);
+    PByte(UInt(Dst)+3)^ := 0;
     Inc(Dst, 4);
   end;
 
@@ -117,10 +117,10 @@ var
     R := (ARGB565 shr 11) and $1F;
     G := (ARGB565 shr 5) and $3F;
     B := (ARGB565) and $1F;
-    PByte(UINT(Dst)+0)^ := (b shl 3) or (b shr 2);
-    PByte(UINT(Dst)+1)^ := (g shl 2) or (g shr 4);
-    PByte(UINT(Dst)+2)^ := (r shl 3) or (r shr 2);
-    PByte(UINT(Dst)+3)^ := 0;
+    PByte(UInt(Dst)+0)^ := (b shl 3) or (b shr 2);
+    PByte(UInt(Dst)+1)^ := (g shl 2) or (g shr 4);
+    PByte(UInt(Dst)+2)^ := (r shl 3) or (r shr 2);
+    PByte(UInt(Dst)+3)^ := 0;
     Inc(Dst, 4);
   end;
 
@@ -128,9 +128,9 @@ var
   var
     Y,U,V : Integer;
   begin
-    Y := PByte(UINT(ASrc)+(AY * AHdr.bmiHeader.biWidth + AX))^;
-    U := PByte(UINT(ASrc)+((AY div 2) * (AHdr.bmiHeader.biWidth div 2) + AX div 2 + ASize + (ASize div 4)))^;
-    V := PByte(UINT(ASrc)+((AY div 2) * (AHdr.bmiHeader.biWidth div 2) + AX div 2 + ASize))^;
+    Y := PByte(UInt64(ASrc)+(AY * AHdr.bmiHeader.biWidth + AX))^;
+    U := PByte(UInt64(ASrc)+((AY div 2) * (AHdr.bmiHeader.biWidth div 2) + AX div 2 + ASize + (ASize div 4)))^;
+    V := PByte(UInt64(ASrc)+((AY div 2) * (AHdr.bmiHeader.biWidth div 2) + AX div 2 + ASize))^;
     YUVToRGB8888(0, Y, U, V);
     Inc(Dst, 4);
   end;
@@ -149,10 +149,10 @@ begin
   begin
     For I := 0 to (ASourceLen div 3)-1 do
     begin
-      PByte(UINT(Dst)+0)^ := PByte(UINT(Src)+0)^;
-      PByte(UINT(Dst)+1)^ := PByte(UINT(Src)+1)^;
-      PByte(UINT(Dst)+2)^ := PByte(UINT(Src)+2)^;
-      PByte(UINT(Dst)+3)^ := 0;
+      PByte(UInt(Dst)+0)^ := PByte(UInt(Src)+0)^;
+      PByte(UInt(Dst)+1)^ := PByte(UInt(Src)+1)^;
+      PByte(UInt(Dst)+2)^ := PByte(UInt(Src)+2)^;
+      PByte(UInt(Dst)+3)^ := 0;
       Inc(Dst, 4);
       Inc(Src, 3);
     end;
@@ -196,31 +196,31 @@ begin
       LineWidth := AHdr.bmiHeader.biWidth div 2;
       For Y := AHdr.bmiHeader.biHeight-1 downto 0 do
       begin
-        Src := PByte(UINT(ASource) + (Y*(LineWidth*4)));
+        Src := PByte(UInt64(ASource) + (Y*(LineWidth*4)));
         For X := 0 to LineWidth-1 do
         begin
           if (IsEqualGuid(ASubType, MEDIASUBTYPE_YUY2) or
               IsEqualGuid(ASubType, MEDIASUBTYPE_YUYV)
              ) then
           begin
-            YUV[0] := PByte(UINT(Src)+0)^; // y1
-            YUV[1] := PByte(UINT(Src)+1)^; // u
-            YUV[2] := PByte(UINT(Src)+2)^; // y2
-            YUV[3] := PByte(UINT(Src)+3)^; // v
+            YUV[0] := PByte(UInt64(Src)+0)^; // y1
+            YUV[1] := PByte(UInt64(Src)+1)^; // u
+            YUV[2] := PByte(UInt64(Src)+2)^; // y2
+            YUV[3] := PByte(UInt64(Src)+3)^; // v
           end
           else if IsEqualGuid(ASubType, MEDIASUBTYPE_YVYU) then
           begin
-            YUV[0] := PByte(UINT(Src)+0)^; // y1
-            YUV[3] := PByte(UINT(Src)+1)^; // v
-            YUV[2] := PByte(UINT(Src)+2)^; // y2
-            YUV[1] := PByte(UINT(Src)+3)^; // u
+            YUV[0] := PByte(UInt64(Src)+0)^; // y1
+            YUV[3] := PByte(UInt64(Src)+1)^; // v
+            YUV[2] := PByte(UInt64(Src)+2)^; // y2
+            YUV[1] := PByte(UInt64(Src)+3)^; // u
           end
           else if IsEqualGuid(ASubType, MEDIASUBTYPE_UYVY) then
           begin
-            YUV[1] := PByte(UINT(Src)+0)^; // u
-            YUV[0] := PByte(UINT(Src)+1)^; // y1
-            YUV[3] := PByte(UINT(Src)+2)^; // v
-            YUV[2] := PByte(UINT(Src)+3)^; // y2
+            YUV[1] := PByte(UInt64(Src)+0)^; // u
+            YUV[0] := PByte(UInt64(Src)+1)^; // y1
+            YUV[3] := PByte(UInt64(Src)+2)^; // v
+            YUV[2] := PByte(UInt64(Src)+3)^; // y2
           end;
           YUV422ToRGB8888(YUV[1], YUV[3], YUV[0], YUV[2]);
           Inc(Src, 4);
