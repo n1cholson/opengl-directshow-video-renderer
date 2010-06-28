@@ -1,1 +1,1 @@
-{.$define EnableXenorateTrace}
+{$define EnableXenorateTrace}

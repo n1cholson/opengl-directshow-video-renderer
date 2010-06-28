@@ -1,6 +1,6 @@
 object frmOpenGLRenderer: TfrmOpenGLRenderer
-  Left = 600
-  Top = 248
+  Left = 788
+  Top = 326
   Width = 548
   Height = 301
   Caption = 'OpenGL Video Renderer'

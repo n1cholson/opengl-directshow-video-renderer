@@ -46,6 +46,8 @@ implementation
 
 uses
   // Delphi
+  Windows,
+  Messages,
   SysUtils,
 
   // 3rd party

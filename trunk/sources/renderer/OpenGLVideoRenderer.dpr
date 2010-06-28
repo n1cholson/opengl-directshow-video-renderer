@@ -40,7 +40,10 @@ uses
   utils in 'utils.pas',
   formOpenGLRenderer in 'formOpenGLRenderer.pas' {frmRenderer},
   VideoRendererFilter in 'VideoRendererFilter.pas',
-  OpenGLVideoRendererFilter in 'OpenGLVideoRendererFilter.pas';
+  OpenGLVideoRendererFilter in 'OpenGLVideoRendererFilter.pas',
+  texture in 'texture.pas',
+  glsl in 'glsl.pas',
+  dglOpenGL in '..\headers\dglOpenGL.pas';
 
 {$E ax}
 
