@@ -61,9 +61,6 @@ type
     procedure DoInitialize(Info : PVideoInfoHeader; SubType : TGUID); override;
   end;
 
-var
-  frmOpenGLRenderer: TfrmOpenGLRenderer;
-
 implementation
 
 {$R *.dfm}
