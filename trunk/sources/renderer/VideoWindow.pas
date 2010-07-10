@@ -10,6 +10,34 @@ uses
   // 3rd party
   dglOpenGL;
 
+function CreateVideoWindow(AMediaType : PAMMediaType) : Boolean;
+procedure ReleaseVideoWindow;
+function ShowVideoWindow : Boolean;
+function HideVideoWindow : Boolean;
+function CreateOpenGL : Boolean;
+procedure ReleaseOpenGL;
+procedure UpdateSample(ASample : IMediaSample);
+function VideoWindowFormat : TVideoInfoHeader;
+function GetVideoWindowVisible : Boolean;
+function SetVideoWindowVisible(AVis : Boolean) : Boolean;
+function GetVideoWindowOwner : HWND;
+function SetVideoWindowOwner(AOwner : HWND) : Boolean;
+function SetVideoWindowPosition(ALeft, ATop, AWidth, AHeight : Integer) : Boolean;
+
+implementation
+
+uses
+  // Delphi
+  Classes,
+  SysUtils,
+  Messages,
+
+  // Own
+  utils,
+  conversion,
+  glsl,
+  texture;
+
 var
   // Window variables
   FWndClass : TWndClassEx;
@@ -29,27 +57,77 @@ var
   FRC       : HGLRC;
   FGLInited : Boolean;
 
-function CreateVideoWindow(AMediaType : PAMMediaType) : Boolean;
-procedure ReleaseVideoWindow;
-procedure ShowVideoWindow;
-procedure HideVideoWindow;
-function CreateOpenGL : Boolean;
-procedure ReleaseOpenGL;
+function VideoWindowFormat : TVideoInfoHeader;
+begin
+  Result := FFormat;
+end;
+
+procedure DrawQuad(W, H, TW, TH: integer);
+begin
+  glBegin(GL_QUADS);
+  glTexCoord2f(0, 0); glVertex3f(0, H, 0);
+  glTexCoord2f(TW, 0); glVertex3f(W, H, 0);
+  glTexCoord2f(TW, TH); glVertex3f(W, 0, 0);
+  glTexCoord2f(0, TH); glVertex3f(0, 0, 0);
+  glEnd;
+end;
+
+procedure DrawOpenGL(AClientRect : TRect);
+var
+  W, H : Integer;
+begin
+  // Activate rendering context
+  ActivateRenderingContext(FDC, FRC);
+
+  W := AClientRect.Right - AClientRect.Left;
+  H := AClientRect.Bottom - AClientRect.Top;
+
+  glViewPort(0, 0, W, H);
+
+  glMatrixMode(GL_PROJECTION);
+  glLoadIdentity;
+  glOrtho(0, W, H, 0, -1, 1);
+
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity;
+
+  glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT);
+  glLoadIdentity;
+
+  glColor3f(1,0,0);
+  DrawQuad(W, H, 1, 1);
+
+  SwapBuffers(FDC);
+  glFinish;
+
+  // Deactivate rendering context
+  DeactivateRenderingContext;
+end;
+
 procedure PaintVideoWindow;
-
-implementation
-
-uses
-  // Delphi
-  Classes,
-  SysUtils,
-  Messages,
-
-  // Own
-  utils,
-  conversion,
-  glsl,
-  texture;
+var
+  R : TRect;
+begin
+  Windows.GetClientRect(FWnd, R);
+  if FGLInited then
+    DrawOpenGL(R)
+  else
+  begin
+    // Draw bitmap bits to window device context
+    if (IsEqualGuid(FSubType, MEDIASUBTYPE_RGB24) or
+        IsEqualGuid(FSubType, MEDIASUBTYPE_RGB32)) and
+        (FSampleS > 0) then
+    begin
+      StretchDIBits(FDC,
+        0, 0, R.Right - R.Left, R.Bottom - R.Top,
+        0, 0, FWidth, FHeight,
+        FSample, PBitmapInfo(@fFormat.bmiHeader)^,
+        DIB_RGB_COLORS, SRCCOPY);
+    end
+    else
+      FillRect(FDC, Rect(0, 0, R.Right - R.Left, R.Bottom - R.Top), HBRUSH(COLOR_BTNFACE));
+  end;
+end;
 
 function WndMessageProc(AhWnd: HWND; AMsg: UINT; AWParam: WPARAM; ALParam: LPARAM): UINT; stdcall;
 var
@@ -301,81 +379,110 @@ begin
   end;
 end;
 
-procedure DrawQuad(W, H, TW, TH: integer);
+function ShowVideoWindow : Boolean;
 begin
-  glBegin(GL_QUADS);
-  glTexCoord2f(0, 0); glVertex3f(0, H, 0);
-  glTexCoord2f(TW, 0); glVertex3f(W, H, 0);
-  glTexCoord2f(TW, TH); glVertex3f(W, 0, 0);
-  glTexCoord2f(0, TH); glVertex3f(0, 0, 0);
-  glEnd;
+  if FWnd <> 0 then
+  begin
+    ShowWindow(FWnd, SW_SHOWNORMAL);
+    Result := True;
+  end
+  else
+    Result := False;
 end;
 
-procedure DrawOpenGL(AClientRect : TRect);
+function HideVideoWindow : Boolean;
+begin
+  if FWnd <> 0 then
+  begin
+    ShowWindow(FWnd, SW_HIDE);
+    Result := True;
+  end
+  else
+    Result := False;
+end;
+
+function GetVideoWindowVisible : Boolean;
+begin
+  if FWnd <> 0 then
+    Result := IsWindowVisible(FWnd)
+  else
+    Result := False;
+end;
+
+function SetVideoWindowVisible(AVis : Boolean) : Boolean;
+begin
+  if FWnd <> 0 then
+  begin
+    if AVis then
+      Result := ShowVideoWindow
+    else
+      Result := HideVideoWindow;
+  end
+  else
+    Result := False;
+end;
+
+function GetVideoWindowOwner : HWND;
+begin
+  if FWnd <> 0 then
+    Result := GetParent(FWnd)
+  else
+    Result := 0;
+end;
+
+function SetVideoWindowOwner(AOwner : HWND) : Boolean;
+begin
+  WriteTrace('SetVideoWindowOwner.Enter');
+  Result := False;
+  if FWnd <> 0 then
+  begin
+    // Release opengl
+    WriteTrace('Release opengl');
+    ReleaseOpenGL;
+
+    // Change parent
+    WriteTrace('Set new parent');
+    SetParent(FWnd, AOwner);
+    
+    // Release opengl
+    WriteTrace('Create opengl');
+    if CreateOpenGL() then
+      Result := True
+    else
+      WriteTrace('Could not create opengl!');
+  end
+  else
+    WriteTrace('No window handle present!');
+  WriteTrace('SetVideoWindowOwner.Leave with result: ' + BoolToStr(Result));
+end;
+
+function SetVideoWindowPosition(ALeft, ATop, AWidth, AHeight : Integer) : Boolean;
+begin
+  if FWnd <> 0 then
+  begin
+    MoveWindow(FWnd, ALeft, ATop, AWidth, AHeight, True);
+    Result := True;
+  end
+  else
+    Result := False;
+end;
+
+procedure UpdateSample(ASample : IMediaSample);
 var
-  W, H : Integer;
-begin
-  // Activate rendering context
-  ActivateRenderingContext(FDC, FRC);
-
-  W := AClientRect.Right - AClientRect.Left;
-  H := AClientRect.Bottom - AClientRect.Top;
-
-  glViewPort(0, 0, W, H);
-
-  glMatrixMode(GL_PROJECTION);
-  glLoadIdentity;
-  glOrtho(0, W, H, 0, -1, 1);
-
-  glMatrixMode(GL_MODELVIEW);
-  glLoadIdentity;
-
-  glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT);
-  glLoadIdentity;
-
-  glColor3f(1,0,0);
-  DrawQuad(W, H, 1, 1);
-
-  SwapBuffers(FDC);
-  glFinish;
-
-  // Deactivate rendering context
-  DeactivateRenderingContext;
-end;
-
-procedure ShowVideoWindow;
-begin
-  ShowWindow(FWnd, SW_SHOWNORMAL);
-end;
-
-procedure HideVideoWindow;
-begin
-  ShowWindow(FWnd, SW_HIDE);
-end;
-
-procedure PaintVideoWindow;
-var
+  Bits: PByte;
   R : TRect;
 begin
+  // Get current sample pointer
+  FSampleS := ASample.GetSize;
+  ASample.GetPointer(Bits);
+
+  // Move sample to sample buffer
+  Assert(FSampleS <= FSampleL);
+  Move(Bits^, FSample^, FSampleS);
+
+  // Paint window
   Windows.GetClientRect(FWnd, R);
-  if FGLInited then
-    DrawOpenGL(R)
-  else
-  begin
-    // Draw bitmap bits to window device context
-    if (IsEqualGuid(FSubType, MEDIASUBTYPE_RGB24) or
-        IsEqualGuid(FSubType, MEDIASUBTYPE_RGB32)) and
-        (FSampleS > 0) then
-    begin
-      StretchDIBits(FDC,
-        0, 0, R.Right - R.Left, R.Bottom - R.Top,
-        0, 0, FWidth, FHeight,
-        FSample, PBitmapInfo(@fFormat.bmiHeader)^,
-        DIB_RGB_COLORS, SRCCOPY);
-    end
-    else
-      FillRect(FDC, Rect(0, 0, R.Right - R.Left, R.Bottom - R.Top), HBRUSH(COLOR_BTNFACE));
-  end;
+  InvalidateRect(FWnd, @R, False);
 end;
 
 initialization

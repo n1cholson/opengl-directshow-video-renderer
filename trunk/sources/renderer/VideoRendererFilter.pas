@@ -319,9 +319,6 @@ begin
 end;
 
 function TVideoRendererFilter.DoRenderSample(MediaSample: IMediaSample): HResult;
-var
-  Bits: PByte;
-  R : TRect;
 begin
   // No mediatype, exit with pointer error
   if (MediaSample = nil) then
@@ -329,18 +326,8 @@ begin
     Result := E_POINTER;
     Exit;
   end;
-
-  // Get current sample pointer
-  FSampleS := MediaSample.GetSize;
-  MediaSample.GetPointer(Bits);
-
-  // Move sample to sample buffer
-  Assert(FSampleS <= FSampleL);
-  Move(Bits^, FSample^, FSampleS);
-
-  // Paint window
-  Windows.GetClientRect(FWnd, R);
-  InvalidateRect(FWnd, @R, False);
+  // Update sample
+  UpdateSample(MediaSample);
   Result := NOERROR;
 end;
 
@@ -416,35 +403,35 @@ end;
 function TVideoRendererFilter.get_AvgTimePerFrame(out pAvgTimePerFrame: TRefTime): HResult; stdcall;
 begin
   if not CheckConnected(FInputPin, Result) then Exit;
-  pAvgTimePerFrame := fFormat.AvgTimePerFrame;
+  pAvgTimePerFrame := VideoWindowFormat.AvgTimePerFrame;
   Result := NOERROR;
 end;
 
 function TVideoRendererFilter.get_BitRate(out pBitRate: Longint): HResult; stdcall;
 begin
   if not CheckConnected(FInputPin,Result) then Exit;
-  pBitRate := fFormat.dwBitRate;
+  pBitRate := VideoWindowFormat.dwBitRate;
   Result := NOERROR;
 end;
 
 function TVideoRendererFilter.get_BitErrorRate(out pBitErrorRate: Longint): HResult; stdcall;
 begin
   if not CheckConnected(FInputPin,Result) then Exit;
-  pBitErrorRate := fFormat.dwBitErrorRate;
+  pBitErrorRate := VideoWindowFormat.dwBitErrorRate;
   Result := NOERROR;
 end;
 
 function TVideoRendererFilter.get_VideoWidth(out pVideoWidth: Longint): HResult; stdcall;
 begin
   if not CheckConnected(FInputPin,Result) then Exit;
-  pVideoWidth := fFormat.bmiHeader.biWidth;
+  pVideoWidth := VideoWindowFormat.bmiHeader.biWidth;
   Result := NOERROR;
 end;
 
 function TVideoRendererFilter.get_VideoHeight(out pVideoHeight: Longint): HResult; stdcall;
 begin
   if not CheckConnected(FInputPin,Result) then Exit;
-  pVideoHeight := fFormat.bmiHeader.biHeight;
+  pVideoHeight := VideoWindowFormat.bmiHeader.biHeight;
   Result := NOERROR;
 end;
 
@@ -561,8 +548,8 @@ end;
 function TVideoRendererFilter.GetVideoSize(out pWidth, pHeight: Longint): HResult; stdcall;
 begin
   if not CheckConnected(FInputPin,Result) then Exit;
-  pWidth := fFormat.bmiHeader.biWidth;
-  pHeight := fFormat.bmiHeader.biHeight;
+  pWidth := VideoWindowFormat.bmiHeader.biWidth;
+  pHeight := VideoWindowFormat.bmiHeader.biHeight;
   Result := NOERROR;
 end;
 
@@ -661,27 +648,18 @@ end;
 
 function TVideoRendererFilter.put_Visible(Visible: LongBool): HResult; stdcall;
 begin
-  if FWnd <> 0 then
+  if not SetVideoWindowVisible(Visible) then
   begin
-    if Visible then
-      ShowVideoWindow
-    else
-      HideVideoWindow;
-    Result := NOERROR;
-  end
-  else
     Result := E_FAIL;
+    Exit;
+  end;
+  Result := NOERROR;
 end;
 
 function TVideoRendererFilter.get_Visible(out pVisible: LongBool): HResult; stdcall;
 begin
-  if FWnd <> 0 then
-  begin
-    pVisible := IsWindowVisible(FWnd);
-    Result := NOERROR;
-  end
-  else
-    Result := E_FAIL;
+  pVisible := GetVideoWindowVisible;
+  Result := NOERROR;
 end;
 
 function TVideoRendererFilter.put_Left(Left: Longint): HResult; stdcall;
@@ -726,44 +704,26 @@ end;
 
 function TVideoRendererFilter.put_Owner(Owner: OAHWND): HResult; stdcall;
 begin
-  WriteTrace('put_Owner.Enter');
-  if FWnd <> 0 then
+  if not SetVideoWindowOwner(Owner) then
   begin
-    // Release opengl
-    WriteTrace('Release opengl');
-    ReleaseOpenGL;
-
-    // Change parent
-    WriteTrace('Set new parent');
-    SetParent(FWnd, Owner);
-    
-    // Release opengl
-    WriteTrace('Create opengl');
-    if not CreateOpenGL() then
-    begin
-      WriteTrace('Could not create opengl!');
-      Result := E_FAIL;
-    end
-    else
-      Result := NOERROR;
-  end
-  else
-  begin
-    WriteTrace('No window handle present!');
     Result := E_FAIL;
+    Exit;
   end;
-  WriteTrace('put_Owner.Leave with result: ' + IntToStr(Result));
+  Result := NOERROR;
 end;
 
 function TVideoRendererFilter.get_Owner(out Owner: OAHWND): HResult; stdcall;
+var
+  O : HWND;
 begin
-  if FWnd <> 0 then
+  O := GetVideoWindowOwner;
+  if O = 0 then
   begin
-    Owner := GetParent(FWnd);
-    Result := NOERROR;
-  end
-  else
     Result := E_FAIL;
+    Exit;
+  end;
+  Owner := O;
+  Result := NOERROR;
 end;
 
 function TVideoRendererFilter.put_MessageDrain(Drain: OAHWND): HResult; stdcall;
@@ -808,13 +768,12 @@ end;
 
 function TVideoRendererFilter.SetWindowPosition(Left, Top, Width, Height: Longint): HResult; stdcall;
 begin
-  if FWnd <> 0 then
+  if not SetVideoWindowPosition(Left, Top, Width, Height) then
   begin
-    MoveWindow(FWnd, Left, Top, Width, Height, True);
-    Result := NOERROR;
-  end
-  else
     Result := E_FAIL;
+    Exit;
+  end;
+  Result := NOERROR;
 end;
 
 function TVideoRendererFilter.GetWindowPosition(out pLeft, pTop, pWidth, pHeight: Longint): HResult; stdcall;
