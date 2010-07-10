@@ -45,7 +45,8 @@ uses
 
   // 3rd party
   BaseClass,
-  DirectShow9;
+  DirectShow9,
+  DGLOpenGL;
 
 const
   CLSID_OpenGLVideoRenderer: TGUID = '{5BA04474-46C4-4802-B52F-3EA19B75B227}';
@@ -60,20 +61,27 @@ type
     FDispatch : TBCBaseDispatch;
 
     // Window variables
-    FWndClass : TWndClass;
+    FWndClass : TWndClassEx;
     FWnd      : HWND;
     FDC       : HDC;
+
+    // OpenGL variables
+    FRC       : HGLRC;
+    FGLInited : Boolean;
 
     // Sample variables
     FWidth    : Integer;
     FHeight   : Integer;
     FFormat   : TVideoInfoHeader;
+    FSubType  : TGUID;
 
     function NotImplemented : HResult;
 
     procedure DoClear;
     procedure DoShowWindow;
     procedure DoHideWindow;
+
+    procedure DrawOpenGL(AClientRect : TRect);
 
   public
     (*** TBCBaseRenderer methods ***)
@@ -237,12 +245,15 @@ begin
   FillChar(FWndClass, SizeOf(FWndClass), #0);
   FWnd      := 0;
   FDC       := 0;
+  FRC       := 0;
+  FGLInited := False;
 
   // Initialize sample variables
   WriteTrace('Clear data');
   FWidth    := 0;
   FHeight   := 0;
   FillChar(fFormat, SizeOf(TVideoInfoHeader), #0);
+  FSubType := GUID_NULL;
 
   WriteTrace('Create.Leave');
 end;
@@ -279,6 +290,17 @@ procedure TVideoRendererFilter.DoClear;
 begin
   WriteTrace('DoClear.Enter');
 
+  // Release rendering context
+  if FRC <> 0 then
+  begin
+    WriteTrace('Deactivate rendering context');
+    DeactivateRenderingContext;
+
+    WriteTrace('Release rendering context');
+    DestroyRenderingContext(FRC);
+    FRC := 0;
+  end;
+
   // Release device context
   if (FDC <> 0) then
   begin
@@ -296,14 +318,20 @@ begin
   end;
 
   // Unregister class
-  WriteTrace('Unregister class');
-  Windows.UnRegisterClass(FWndClass.lpszClassName, hInstance);
+  if FWndClass.hInstance <> 0 then
+  begin
+    WriteTrace('Unregister class');
+    Windows.UnRegisterClass(FWndClass.lpszClassName, hInstance);
+  end;
 
   // Clear data
   WriteTrace('Clear data');
   FillChar(fFormat, SizeOf(TVideoInfoHeader), #0);
   fWidth := 0;
   fHeight := 0;
+  FSubType := GUID_NULL;
+
+  FGLInited := False;
 
   WriteTrace('DoClear.Leave');
 end;
@@ -388,6 +416,45 @@ begin
   Result := NOERROR;
 end;
 
+procedure DrawQuad(W, H, TW, TH: integer);
+begin
+  glBegin(GL_QUADS);
+  glTexCoord2f(0, 0); glVertex3f(0, H, 0);
+  glTexCoord2f(TW, 0); glVertex3f(W, H, 0);
+  glTexCoord2f(TW, TH); glVertex3f(W, 0, 0);
+  glTexCoord2f(0, TH); glVertex3f(0, 0, 0);
+  glEnd;
+end;
+
+procedure TVideoRendererFilter.DrawOpenGL(AClientRect : TRect);
+var
+  W, H : Integer;
+begin
+  // Activate rendering context
+  ActivateRenderingContext(FDC, FRC);
+
+  W := AClientRect.Right - AClientRect.Left;
+  H := AClientRect.Bottom - AClientRect.Top;
+
+  glViewPort(0, 0, W, H);
+
+  glMatrixMode(GL_PROJECTION);
+  glLoadIdentity;
+  glOrtho(0, W, H, 0, -1, 1);
+
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity;
+
+  glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT);
+  glLoadIdentity;
+
+  SwapBuffers(FDC);
+  glFinish;
+
+  // Deactivate rendering context
+  DeactivateRenderingContext;
+end;
+
 function TVideoRendererFilter.DoRenderSample(MediaSample: IMediaSample): HResult;
 var
   Bits: PByte;
@@ -406,14 +473,35 @@ begin
   // Get client rect
   Windows.GetClientRect(fWnd, R);
 
-  // Draw bitmap bits to window device context
-  StretchDIBits(FDC,
-    0, 0, R.Right - R.Left, R.Bottom - R.Top,
-    0, 0, FWidth, FHeight,
-    Bits, PBitmapInfo(@fFormat.bmiHeader)^,
-    DIB_RGB_COLORS, SRCCOPY);
+  // Draw opengl
+  if FGLInited then
+    DrawOpenGL(R)
+  else
+  begin
+    // Draw bitmap bits to window device context
+    if IsEqualGuid(FSubType, MEDIASUBTYPE_RGB24) or
+       IsEqualGuid(FSubType, MEDIASUBTYPE_RGB32) then
+    begin
+      StretchDIBits(FDC,
+        0, 0, R.Right - R.Left, R.Bottom - R.Top,
+        0, 0, FWidth, FHeight,
+        Bits, PBitmapInfo(@fFormat.bmiHeader)^,
+        DIB_RGB_COLORS, SRCCOPY);
+    end
+    else
+      FillRect(FDC, Rect(0, 0, R.Right - R.Left, R.Bottom - R.Top), HBRUSH(COLOR_BTNFACE));
+  end;
 
   Result := NOERROR;
+end;
+
+procedure SetupOpenGL;
+begin
+  glEnable(GL_DEPTH_TEST);
+  glDepthFunc(GL_LESS);
+  glClearColor(1, 1, 1, 1);
+  glDisable(GL_CULL_FACE);
+  glHint(GL_POLYGON_SMOOTH_HINT,GL_NICEST);
 end;
 
 function TVideoRendererFilter.SetMediaType(MediaType: PAMMediaType): HResult;
@@ -486,20 +574,25 @@ begin
 
   FWidth  := FFormat.bmiHeader.biWidth;
   FHeight := FFormat.bmiHeader.biHeight;
-  WriteTrace(Format('Using bitmap size: %d x %d', [FWidth, FHeight]));
+  WriteTrace(Format('Using image size: %d x %d', [FWidth, FHeight]));
+
+  FSubType := MediaType^.subtype;
+  WriteTrace(Format('Using subtype: %s', [SGUIDToString(FSubType)]));
 
   // Initialize window class
   WriteTrace('Initialize window class');
-  FillChar(FWndClass, SizeOf(TWndClass), #0);
+  FillChar(FWndClass, SizeOf(TWndClassEx), #0);
+  FWndClass.cbSize := SizeOf(TWndClassEx);
   FWndClass.hInstance := hInstance;
   FWndClass.lpfnWndProc := @WndMessageProc;
   FWndClass.hIcon := LoadIcon(hInstance, 'MAINICON');
   FWndClass.lpszClassName := 'OpenGLVideoRendererClass';
   FWndClass.hCursor := LoadCursor(0, IDC_ARROW);
+  FWndClass.style := CS_HREDRAW or CS_VREDRAW or CS_OWNDC;
 
   // Register window class
   WriteTrace('Register window class');
-  if Windows.RegisterClass(FWndClass) = 0 then
+  if Windows.RegisterClassEx(FWndClass) = 0 then
   begin
     WriteTrace('Window class could not be registered: ' + SysErrorMessage(GetLastError()));
 
@@ -516,7 +609,7 @@ begin
   FWnd := CreateWindow(
     FWndClass.lpszClassName,
     'OpenGL Video Renderer',
-    WS_CAPTION or WS_THICKFRAME, // NOT Visible
+    WS_CAPTION or WS_THICKFRAME,
     0, 0, 320, 240,
     0, 0, hInstance, nil
     );
@@ -533,6 +626,7 @@ begin
     Result := E_FAIL;
     Exit;
   end;
+  WriteTrace('Window handle: ' + IntToStr(FWnd));
 
   // Get device context
   WriteTrace('Get device context');
@@ -550,6 +644,38 @@ begin
     Result := E_FAIL;
     Exit;
   end;
+  WriteTrace('Device context: ' + IntToStr(FDC));
+
+  // Create rendering context
+  WriteTrace('Create rendering context');
+  FRC := CreateRenderingContext(FDC, [opDoubleBuffered], 24, 16, 0, 0, 0, 0);
+
+  // Rendering context could not be created
+  if FRC = 0 then
+  begin
+    WriteTrace('Rendering context could not be created!');
+
+    WriteTrace('Clear');
+    DoClear;
+
+    WriteTrace('Exiting with fail');
+    Result := E_FAIL;
+    Exit;
+  end;
+  WriteTrace('Rendering context: ' + IntToStr(FRC));
+
+  // Activate rendering context
+  WriteTrace('Activate rendering context');
+  ActivateRenderingContext(FDC, FRC);
+
+  WriteTrace('Setup opengl');
+  SetupOpenGL;
+
+  FGLInited := True;
+
+  // Deactivate rendering context
+  WriteTrace('Deactivate rendering context');
+  DeactivateRenderingContext;
 
   Result := NOERROR;
 
