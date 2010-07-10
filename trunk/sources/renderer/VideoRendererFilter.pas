@@ -81,6 +81,8 @@ type
     procedure DoShowWindow;
     procedure DoHideWindow;
 
+    function CreateOpenGL : Boolean;
+    procedure ReleaseOpenGL;
     procedure DrawOpenGL(AClientRect : TRect);
 
   public
@@ -290,16 +292,9 @@ procedure TVideoRendererFilter.DoClear;
 begin
   WriteTrace('DoClear.Enter');
 
-  // Release rendering context
-  if FRC <> 0 then
-  begin
-    WriteTrace('Deactivate rendering context');
-    DeactivateRenderingContext;
-
-    WriteTrace('Release rendering context');
-    DestroyRenderingContext(FRC);
-    FRC := 0;
-  end;
+  // Release opengl
+  WriteTrace('Release opengl');
+  ReleaseOpenGL;
 
   // Release device context
   if (FDC <> 0) then
@@ -330,8 +325,6 @@ begin
   fWidth := 0;
   fHeight := 0;
   FSubType := GUID_NULL;
-
-  FGLInited := False;
 
   WriteTrace('DoClear.Leave');
 end;
@@ -426,6 +419,64 @@ begin
   glEnd;
 end;
 
+procedure SetupOpenGL;
+begin
+  glEnable(GL_DEPTH_TEST);
+  glDepthFunc(GL_LESS);
+  glClearColor(1, 1, 1, 1);
+  glDisable(GL_CULL_FACE);
+  glHint(GL_POLYGON_SMOOTH_HINT,GL_NICEST);
+end;
+
+function TVideoRendererFilter.CreateOpenGL : Boolean;
+begin
+  WriteTrace('CreateOpenGL.Enter');
+  Result := False;
+
+  // Create rendering context
+  WriteTrace('Create rendering context');
+  FRC := CreateRenderingContext(FDC, [opDoubleBuffered], 32, 16, 0, 0, 0, 0);
+
+  // Rendering context could not be created
+  if FRC = 0 then
+  begin
+    WriteTrace('Rendering context could not be created!');
+    Exit;
+  end;
+  WriteTrace('Rendering context: ' + IntToStr(FRC));
+
+  // Activate rendering context
+  WriteTrace('Activate rendering context');
+  ActivateRenderingContext(FDC, FRC);
+
+  WriteTrace('Setup opengl');
+  SetupOpenGL;
+
+  // Deactivate rendering context
+  WriteTrace('Deactivate rendering context');
+  DeactivateRenderingContext;
+
+  FGLInited := True;
+  Result := True;
+  WriteTrace('CreateOpenGL.Leave with result: ' + BoolToStr(Result));
+end;
+
+procedure TVideoRendererFilter.ReleaseOpenGL;
+begin
+  FGLInited := False;
+
+  // Release rendering context
+  if FRC <> 0 then
+  begin
+    WriteTrace('Deactivate rendering context');
+    DeactivateRenderingContext;
+
+    WriteTrace('Release rendering context');
+    DestroyRenderingContext(FRC);
+    FRC := 0;
+  end;
+end;
+
 procedure TVideoRendererFilter.DrawOpenGL(AClientRect : TRect);
 var
   W, H : Integer;
@@ -493,15 +544,6 @@ begin
   end;
 
   Result := NOERROR;
-end;
-
-procedure SetupOpenGL;
-begin
-  glEnable(GL_DEPTH_TEST);
-  glDepthFunc(GL_LESS);
-  glClearColor(1, 1, 1, 1);
-  glDisable(GL_CULL_FACE);
-  glHint(GL_POLYGON_SMOOTH_HINT,GL_NICEST);
 end;
 
 function TVideoRendererFilter.SetMediaType(MediaType: PAMMediaType): HResult;
@@ -646,14 +688,10 @@ begin
   end;
   WriteTrace('Device context: ' + IntToStr(FDC));
 
-  // Create rendering context
-  WriteTrace('Create rendering context');
-  FRC := CreateRenderingContext(FDC, [opDoubleBuffered], 24, 16, 0, 0, 0, 0);
-
-  // Rendering context could not be created
-  if FRC = 0 then
+  WriteTrace('Create opengl');
+  if not CreateOpenGL then
   begin
-    WriteTrace('Rendering context could not be created!');
+    WriteTrace('Could not create opengl!');
 
     WriteTrace('Clear');
     DoClear;
@@ -662,20 +700,6 @@ begin
     Result := E_FAIL;
     Exit;
   end;
-  WriteTrace('Rendering context: ' + IntToStr(FRC));
-
-  // Activate rendering context
-  WriteTrace('Activate rendering context');
-  ActivateRenderingContext(FDC, FRC);
-
-  WriteTrace('Setup opengl');
-  SetupOpenGL;
-
-  FGLInited := True;
-
-  // Deactivate rendering context
-  WriteTrace('Deactivate rendering context');
-  DeactivateRenderingContext;
 
   Result := NOERROR;
 
@@ -1016,13 +1040,33 @@ end;
 
 function TVideoRendererFilter.put_Owner(Owner: OAHWND): HResult; stdcall;
 begin
+  WriteTrace('put_Owner.Enter');
   if FWnd <> 0 then
   begin
+    // Release opengl
+    WriteTrace('Release opengl');
+    ReleaseOpenGL;
+
+    // Change parent
+    WriteTrace('Set new parent');
     SetParent(FWnd, Owner);
-    Result := NOERROR;
+    
+    // Release opengl
+    WriteTrace('Create opengl');
+    if not CreateOpenGL() then
+    begin
+      WriteTrace('Could not create opengl!');
+      Result := E_FAIL;
+    end
+    else
+      Result := NOERROR;
   end
   else
+  begin
+    WriteTrace('No window handle present!');
     Result := E_FAIL;
+  end;
+  WriteTrace('put_Owner.Leave with result: ' + IntToStr(Result));
 end;
 
 function TVideoRendererFilter.get_Owner(out Owner: OAHWND): HResult; stdcall;
