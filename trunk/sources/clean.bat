@@ -11,3 +11,4 @@ del *.ppu /s
 del *.compiled /s
 del fpc-res.or /s
 del fpc-res.res /s
+del *.~inc /s
