@@ -35,6 +35,8 @@ library OpenGLVideoRenderer;
 
 {$include videorenderer_compiler.inc}
 
+{%File 'videorenderer_compiler.inc'}
+
 uses
   BaseClass,
   utils in 'utils.pas',
