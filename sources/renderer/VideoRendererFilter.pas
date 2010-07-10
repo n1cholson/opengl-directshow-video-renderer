@@ -59,32 +59,7 @@ type
   private
     // Dispatch variables
     FDispatch : TBCBaseDispatch;
-
-    // Window variables
-    FWndClass : TWndClassEx;
-    FWnd      : HWND;
-    FDC       : HDC;
-
-    // OpenGL variables
-    FRC       : HGLRC;
-    FGLInited : Boolean;
-
-    // Sample variables
-    FWidth    : Integer;
-    FHeight   : Integer;
-    FFormat   : TVideoInfoHeader;
-    FSubType  : TGUID;
-
     function NotImplemented : HResult;
-
-    procedure DoClear;
-    procedure DoShowWindow;
-    procedure DoHideWindow;
-
-    function CreateOpenGL : Boolean;
-    procedure ReleaseOpenGL;
-    procedure DrawOpenGL(AClientRect : TRect);
-
   public
     (*** TBCBaseRenderer methods ***)
     constructor Create(ObjName: String; Unk: IUnknown; out hr : HResult);
@@ -183,7 +158,8 @@ implementation
 
 uses
   // Own
-  Utils;
+  Utils,
+  videowindow;
 
 var
   SupportedSubTypes : array of TGUID;
@@ -226,11 +202,6 @@ begin
   end;
 end;
 
-function WndMessageProc(hWnd: HWND; Msg: UINT; WParam: WPARAM; LParam: LPARAM): UINT; stdcall;
-begin
-  Result := DefWindowProc(hWnd,Msg,wParam,lParam);
-end;
-
 constructor TVideoRendererFilter.Create(ObjName: String; Unk: IUnknown;
   out hr: HResult);
 begin
@@ -242,20 +213,6 @@ begin
   // Initialize base dispatch
   WriteTrace('Initialize dispatch handler');
   fDispatch := TBCBaseDispatch.Create;
-
-  // Initialize window variables
-  FillChar(FWndClass, SizeOf(FWndClass), #0);
-  FWnd      := 0;
-  FDC       := 0;
-  FRC       := 0;
-  FGLInited := False;
-
-  // Initialize sample variables
-  WriteTrace('Clear data');
-  FWidth    := 0;
-  FHeight   := 0;
-  FillChar(fFormat, SizeOf(TVideoInfoHeader), #0);
-  FSubType := GUID_NULL;
 
   WriteTrace('Create.Leave');
 end;
@@ -274,59 +231,21 @@ destructor TVideoRendererFilter.Destroy;
 begin
   WriteTrace('Destroy.Enter');
 
-  // Release window (Clear data)
-  WriteTrace('Clear');
-  DoClear;
+  // Release video window
+  WriteTrace('Release video window');
+  ReleaseVideoWindow;
 
   // Release dispatch handler
-  WriteTrace('Release dispatch handler');
-  if Assigned(fDispatch) then FreeAndNil(fDispatch);
+  if Assigned(fDispatch) then
+  begin
+    WriteTrace('Release dispatch handler');
+    FreeAndNil(fDispatch);
+  end;
 
   WriteTrace('Inherited destroy');
   inherited Destroy;
 
   WriteTrace('Destroy.Leave');
-end;
-
-procedure TVideoRendererFilter.DoClear;
-begin
-  WriteTrace('DoClear.Enter');
-
-  // Release opengl
-  WriteTrace('Release opengl');
-  ReleaseOpenGL;
-
-  // Release device context
-  if (FDC <> 0) then
-  begin
-    WriteTrace('Release device context');
-    ReleaseDC(FWnd, FDC);
-    FDC := 0;
-  end;
-
-  // Destroy window
-  if (FWnd <> 0) then
-  begin
-    WriteTrace('Destroy window');
-    DestroyWindow(FWnd);
-    FWnd := 0;
-  end;
-
-  // Unregister class
-  if FWndClass.hInstance <> 0 then
-  begin
-    WriteTrace('Unregister class');
-    Windows.UnRegisterClass(FWndClass.lpszClassName, hInstance);
-  end;
-
-  // Clear data
-  WriteTrace('Clear data');
-  FillChar(fFormat, SizeOf(TVideoInfoHeader), #0);
-  fWidth := 0;
-  fHeight := 0;
-  FSubType := GUID_NULL;
-
-  WriteTrace('DoClear.Leave');
 end;
 
 function TVideoRendererFilter.NotImplemented : HResult;
@@ -336,21 +255,11 @@ begin
   Result := E_NOTIMPL;
 end;
 
-procedure TVideoRendererFilter.DoShowWindow;
-begin
-  ShowWindow(FWnd, SW_SHOWNORMAL);
-end;
-
-procedure TVideoRendererFilter.DoHideWindow;
-begin
-  ShowWindow(FWnd, SW_HIDE);
-end;
-
 function TVideoRendererFilter.Active: HResult;
 begin
   WriteTrace('Active.Enter');
-  WriteTrace('Show window');
-  DoShowWindow;
+  WriteTrace('Show video window');
+  ShowVideoWindow;
   WriteTrace('Inherited active');
   Result := inherited Active;
   WriteTrace('Active.Leave with result: ' + IntToStr(Result));
@@ -359,8 +268,8 @@ end;
 function TVideoRendererFilter.Inactive: HResult;
 begin
   WriteTrace('Inactive.Enter');
-  WriteTrace('Hide window');
-  DoHideWindow;
+  WriteTrace('Hide video window');
+  HideVideoWindow;
   WriteTrace('Inherited inactive');
   Result := inherited Inactive;
   WriteTrace('Inactive.Leave with result: ' + IntToStr(Result));
@@ -409,103 +318,6 @@ begin
   Result := NOERROR;
 end;
 
-procedure DrawQuad(W, H, TW, TH: integer);
-begin
-  glBegin(GL_QUADS);
-  glTexCoord2f(0, 0); glVertex3f(0, H, 0);
-  glTexCoord2f(TW, 0); glVertex3f(W, H, 0);
-  glTexCoord2f(TW, TH); glVertex3f(W, 0, 0);
-  glTexCoord2f(0, TH); glVertex3f(0, 0, 0);
-  glEnd;
-end;
-
-procedure SetupOpenGL;
-begin
-  glEnable(GL_DEPTH_TEST);
-  glDepthFunc(GL_LESS);
-  glClearColor(1, 1, 1, 1);
-  glDisable(GL_CULL_FACE);
-  glHint(GL_POLYGON_SMOOTH_HINT,GL_NICEST);
-end;
-
-function TVideoRendererFilter.CreateOpenGL : Boolean;
-begin
-  WriteTrace('CreateOpenGL.Enter');
-  Result := False;
-
-  // Create rendering context
-  WriteTrace('Create rendering context');
-  FRC := CreateRenderingContext(FDC, [opDoubleBuffered], 32, 16, 0, 0, 0, 0);
-
-  // Rendering context could not be created
-  if FRC = 0 then
-  begin
-    WriteTrace('Rendering context could not be created!');
-    Exit;
-  end;
-  WriteTrace('Rendering context: ' + IntToStr(FRC));
-
-  // Activate rendering context
-  WriteTrace('Activate rendering context');
-  ActivateRenderingContext(FDC, FRC);
-
-  WriteTrace('Setup opengl');
-  SetupOpenGL;
-
-  // Deactivate rendering context
-  WriteTrace('Deactivate rendering context');
-  DeactivateRenderingContext;
-
-  FGLInited := True;
-  Result := True;
-  WriteTrace('CreateOpenGL.Leave with result: ' + BoolToStr(Result));
-end;
-
-procedure TVideoRendererFilter.ReleaseOpenGL;
-begin
-  FGLInited := False;
-
-  // Release rendering context
-  if FRC <> 0 then
-  begin
-    WriteTrace('Deactivate rendering context');
-    DeactivateRenderingContext;
-
-    WriteTrace('Release rendering context');
-    DestroyRenderingContext(FRC);
-    FRC := 0;
-  end;
-end;
-
-procedure TVideoRendererFilter.DrawOpenGL(AClientRect : TRect);
-var
-  W, H : Integer;
-begin
-  // Activate rendering context
-  ActivateRenderingContext(FDC, FRC);
-
-  W := AClientRect.Right - AClientRect.Left;
-  H := AClientRect.Bottom - AClientRect.Top;
-
-  glViewPort(0, 0, W, H);
-
-  glMatrixMode(GL_PROJECTION);
-  glLoadIdentity;
-  glOrtho(0, W, H, 0, -1, 1);
-
-  glMatrixMode(GL_MODELVIEW);
-  glLoadIdentity;
-
-  glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT);
-  glLoadIdentity;
-
-  SwapBuffers(FDC);
-  glFinish;
-
-  // Deactivate rendering context
-  DeactivateRenderingContext;
-end;
-
 function TVideoRendererFilter.DoRenderSample(MediaSample: IMediaSample): HResult;
 var
   Bits: PByte;
@@ -519,39 +331,20 @@ begin
   end;
 
   // Get current sample pointer
+  FSampleS := MediaSample.GetSize;
   MediaSample.GetPointer(Bits);
 
-  // Get client rect
-  Windows.GetClientRect(fWnd, R);
+  // Move sample to sample buffer
+  Assert(FSampleS <= FSampleL);
+  Move(Bits^, FSample^, FSampleS);
 
-  // Draw opengl
-  if FGLInited then
-    DrawOpenGL(R)
-  else
-  begin
-    // Draw bitmap bits to window device context
-    if IsEqualGuid(FSubType, MEDIASUBTYPE_RGB24) or
-       IsEqualGuid(FSubType, MEDIASUBTYPE_RGB32) then
-    begin
-      StretchDIBits(FDC,
-        0, 0, R.Right - R.Left, R.Bottom - R.Top,
-        0, 0, FWidth, FHeight,
-        Bits, PBitmapInfo(@fFormat.bmiHeader)^,
-        DIB_RGB_COLORS, SRCCOPY);
-    end
-    else
-      FillRect(FDC, Rect(0, 0, R.Right - R.Left, R.Bottom - R.Top), HBRUSH(COLOR_BTNFACE));
-  end;
-
+  // Paint window
+  Windows.GetClientRect(FWnd, R);
+  InvalidateRect(FWnd, @R, False);
   Result := NOERROR;
 end;
 
 function TVideoRendererFilter.SetMediaType(MediaType: PAMMediaType): HResult;
-var
-  VIH : PVideoInfoHeader;
-  VIH2: PVideoInfoHeader2;
-  MPG1: PMPEG1VideoInfo;
-  MPG2: PMPEG2VideoInfo;
 begin
   WriteTrace('SetMediaType.Enter');
 
@@ -564,139 +357,17 @@ begin
   end;
 
   // Release window (Clear data)
-  WriteTrace('Clear');
-  DoClear;
-
-  WriteTrace('Check mediatype format pointer');
-  Assert(Assigned(MediaType^.pbFormat));
-
-  // Copy video info header to FFormat, based on the given format type
-  if IsEqualGuid(MediaType.formattype, FORMAT_VideoInfo) then
-  begin
-    WriteTrace('Handle video info header');
-    VIH := PVIDEOINFOHEADER(MediaType.pbFormat);
-    CopyMemory(@fFormat, VIH, SizeOf(TVideoInfoHeader));
-  end
-  else if IsEqualGuid(MediaType.formattype, FORMAT_VideoInfo2) then
-  begin
-    WriteTrace('Handle video info header 2');
-    VIH2 := PVIDEOINFOHEADER2(MediaType.pbFormat);
-    with VIH2^ do
-    begin
-      FFormat.rcSource := rcSource;
-      FFormat.rcTarget := rcTarget;
-      FFormat.dwBitRate := dwBitRate;
-      FFormat.dwBitErrorRate := dwBitErrorRate;
-      FFormat.AvgTimePerFrame := AvgTimePerFrame;
-      FFormat.bmiHeader := bmiHeader;
-    end;
-  end
-  else if IsEqualGuid(MediaType.formattype, FORMAT_MPEGVideo) then
-  begin
-    WriteTrace('Handle mpeg 1 video info');
-    MPG1 := PMPEG1VideoInfo(MediaType.pbFormat);
-    CopyMemory(@FFormat, @MPG1^.Hdr, SizeOf(TVideoInfoHeader));
-  end
-  else if IsEqualGuid(MediaType.formattype, FORMAT_MPEG2Video) then
-  begin
-    WriteTrace('Handle mpeg 2 video info');
-    MPG2 := PMPEG2VideoInfo(MediaType.pbFormat);
-    CopyMemory(@FFormat, @MPG2^.Hdr, SizeOf(TVideoInfoHeader));
-  end
-  else
-  begin
-    WriteTrace('Unsupported format type: ' + FGuidToString(MediaType.formattype));
-    Result := E_NOTIMPL;
-    Exit;
-  end;
-
-  WriteTrace('Using major type: ' + MGuidToString(MediaType^.majortype));
-  WriteTrace('Using sub type: ' + SGuidToString(MediaType^.subtype));
-  WriteTrace('Using format type: ' + FGuidToString(MediaType^.formattype));
-
-  FWidth  := FFormat.bmiHeader.biWidth;
-  FHeight := FFormat.bmiHeader.biHeight;
-  WriteTrace(Format('Using image size: %d x %d', [FWidth, FHeight]));
-
-  FSubType := MediaType^.subtype;
-  WriteTrace(Format('Using subtype: %s', [SGUIDToString(FSubType)]));
+  WriteTrace('Release video window');
+  ReleaseVideoWindow;
 
   // Initialize window class
-  WriteTrace('Initialize window class');
-  FillChar(FWndClass, SizeOf(TWndClassEx), #0);
-  FWndClass.cbSize := SizeOf(TWndClassEx);
-  FWndClass.hInstance := hInstance;
-  FWndClass.lpfnWndProc := @WndMessageProc;
-  FWndClass.hIcon := LoadIcon(hInstance, 'MAINICON');
-  FWndClass.lpszClassName := 'OpenGLVideoRendererClass';
-  FWndClass.hCursor := LoadCursor(0, IDC_ARROW);
-  FWndClass.style := CS_HREDRAW or CS_VREDRAW or CS_OWNDC;
-
-  // Register window class
-  WriteTrace('Register window class');
-  if Windows.RegisterClassEx(FWndClass) = 0 then
+  WriteTrace('Create video window');
+  if not CreateVideoWindow(MediaType) then
   begin
-    WriteTrace('Window class could not be registered: ' + SysErrorMessage(GetLastError()));
+    WriteTrace('Release video window');
+    ReleaseVideoWindow;
 
-    WriteTrace('Clear');
-    DoClear;
-
-    WriteTrace('Exiting with fail');
-    Result := E_FAIL;
-    Exit;
-  end;
-
-  // Create output window
-  WriteTrace('Create window');
-  FWnd := CreateWindow(
-    FWndClass.lpszClassName,
-    'OpenGL Video Renderer',
-    WS_CAPTION or WS_THICKFRAME,
-    0, 0, 320, 240,
-    0, 0, hInstance, nil
-    );
-
-  // Window could not be created  
-  if FWnd = 0 then
-  begin
-    WriteTrace('Window could not be created: ' + SysErrorMessage(GetLastError()));
-
-    WriteTrace('Clear');
-    DoClear;
-
-    WriteTrace('Exiting with fail');
-    Result := E_FAIL;
-    Exit;
-  end;
-  WriteTrace('Window handle: ' + IntToStr(FWnd));
-
-  // Get device context
-  WriteTrace('Get device context');
-  FDC := GetDC(FWnd);
-
-  // Device context could not be detected  
-  if FDC = 0 then
-  begin
-    WriteTrace('Device context could not be created: ' + SysErrorMessage(GetLastError()));
-
-    WriteTrace('Clear');
-    DoClear;
-
-    WriteTrace('Exiting with fail');
-    Result := E_FAIL;
-    Exit;
-  end;
-  WriteTrace('Device context: ' + IntToStr(FDC));
-
-  WriteTrace('Create opengl');
-  if not CreateOpenGL then
-  begin
-    WriteTrace('Could not create opengl!');
-
-    WriteTrace('Clear');
-    DoClear;
-
-    WriteTrace('Exiting with fail');
+    WriteTrace('Video window could not be created!');
     Result := E_FAIL;
     Exit;
   end;
@@ -990,12 +661,27 @@ end;
 
 function TVideoRendererFilter.put_Visible(Visible: LongBool): HResult; stdcall;
 begin
-  Result := NotImplemented();
+  if FWnd <> 0 then
+  begin
+    if Visible then
+      ShowVideoWindow
+    else
+      HideVideoWindow;
+    Result := NOERROR;
+  end
+  else
+    Result := E_FAIL;
 end;
 
 function TVideoRendererFilter.get_Visible(out pVisible: LongBool): HResult; stdcall;
 begin
-  Result := NotImplemented();
+  if FWnd <> 0 then
+  begin
+    pVisible := IsWindowVisible(FWnd);
+    Result := NOERROR;
+  end
+  else
+    Result := E_FAIL;
 end;
 
 function TVideoRendererFilter.put_Left(Left: Longint): HResult; stdcall;
@@ -1122,7 +808,13 @@ end;
 
 function TVideoRendererFilter.SetWindowPosition(Left, Top, Width, Height: Longint): HResult; stdcall;
 begin
-  Result := NotImplemented();
+  if FWnd <> 0 then
+  begin
+    MoveWindow(FWnd, Left, Top, Width, Height, True);
+    Result := NOERROR;
+  end
+  else
+    Result := E_FAIL;
 end;
 
 function TVideoRendererFilter.GetWindowPosition(out pLeft, pTop, pWidth, pHeight: Longint): HResult; stdcall;

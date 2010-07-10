@@ -43,7 +43,9 @@ uses
   texture in 'texture.pas',
   glsl in 'glsl.pas',
   dglOpenGL in '..\headers\dglOpenGL.pas',
-  VideoRendererFilter in 'VideoRendererFilter.pas';
+  VideoRendererFilter in 'VideoRendererFilter.pas',
+  conversion in 'conversion.pas',
+  VideoWindow in 'VideoWindow.pas';
 
 {$E ax}
 
