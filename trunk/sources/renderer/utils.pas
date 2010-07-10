@@ -265,7 +265,7 @@ begin
   if tracewnd <> 0 then
   begin
 
-    Parameter := FormatDateTime('yyyy-mm-dd hh:mm:ss:zzz',Now) + TrennZeichen + '5' + TrennZeichen + _Line + #0;
+    Parameter := FormatDateTime('yyyy-mm-dd hh:mm:ss:zzz',Now) + TrennZeichen + '5' + TrennZeichen + 'OpenGLVideoRenderer - ' + _Line + #0;
 
     // fill the TCopyDataStruct structure with data to send
     // TCopyDataStruct mit den Sende-Daten Infos ausfüllen
