@@ -171,6 +171,10 @@ type
 
 implementation
 
+uses
+  // Own
+  Utils;
+
 var
   SupportedSubTypes : array of TGUID;
   SupportedFormatTypes : array of TGUID;
@@ -220,9 +224,13 @@ end;
 constructor TVideoRendererFilter.Create(ObjName: String; Unk: IUnknown;
   out hr: HResult);
 begin
+  WriteTrace('Create.Enter');
+
+  WriteTrace('Inherited Create');
   inherited Create(CLSID_OpenGLVideoRenderer, 'OpenGLVideoRenderer', Unk, hr);
 
   // Initialize base dispatch
+  WriteTrace('Initialize dispatch handler');
   fDispatch := TBCBaseDispatch.Create;
 
   // Initialize window variables
@@ -231,9 +239,12 @@ begin
   FDC       := 0;
 
   // Initialize sample variables
+  WriteTrace('Clear data');
   FWidth    := 0;
   FHeight   := 0;
   FillChar(fFormat, SizeOf(TVideoInfoHeader), #0);
+
+  WriteTrace('Create.Leave');
 end;
 
 constructor TVideoRendererFilter.CreateFromFactory(Factory: TBCClassFactory;
@@ -241,24 +252,37 @@ constructor TVideoRendererFilter.CreateFromFactory(Factory: TBCClassFactory;
 var
   hr: HRESULT;
 begin
+  WriteTrace('CreateFromFactory.Enter');
   Create(Factory.Name, Controller, hr);
+  WriteTrace('CreateFromFactory.Leave');
 end;
 
 destructor TVideoRendererFilter.Destroy;
 begin
+  WriteTrace('Destroy.Enter');
+
   // Release window (Clear data)
+  WriteTrace('Clear');
   DoClear;
 
   // Release dispatch handler
+  WriteTrace('Release dispatch handler');
   if Assigned(fDispatch) then FreeAndNil(fDispatch);
+
+  WriteTrace('Inherited destroy');
   inherited Destroy;
+
+  WriteTrace('Destroy.Leave');
 end;
 
 procedure TVideoRendererFilter.DoClear;
 begin
+  WriteTrace('DoClear.Enter');
+
   // Release device context
   if (FDC <> 0) then
   begin
+    WriteTrace('Release device context');
     ReleaseDC(FWnd, FDC);
     FDC := 0;
   end;
@@ -266,17 +290,22 @@ begin
   // Destroy window
   if (FWnd <> 0) then
   begin
+    WriteTrace('Destroy window');
     DestroyWindow(FWnd);
     FWnd := 0;
   end;
 
   // Unregister class
+  WriteTrace('Unregister class');
   Windows.UnRegisterClass(FWndClass.lpszClassName, hInstance);
 
   // Clear data
+  WriteTrace('Clear data');
   FillChar(fFormat, SizeOf(TVideoInfoHeader), #0);
   fWidth := 0;
   fHeight := 0;
+
+  WriteTrace('DoClear.Leave');
 end;
 
 function TVideoRendererFilter.NotImplemented : HResult;
@@ -298,21 +327,32 @@ end;
 
 function TVideoRendererFilter.Active: HResult;
 begin
+  WriteTrace('Active.Enter');
+  WriteTrace('Show window');
   DoShowWindow;
+  WriteTrace('Inherited active');
   Result := inherited Active;
+  WriteTrace('Active.Leave with result: ' + IntToStr(Result));
 end;
 
 function TVideoRendererFilter.Inactive: HResult;
 begin
+  WriteTrace('Inactive.Enter');
+  WriteTrace('Hide window');
   DoHideWindow;
+  WriteTrace('Inherited inactive');
   Result := inherited Inactive;
+  WriteTrace('Inactive.Leave with result: ' + IntToStr(Result));
 end;
 
 function TVideoRendererFilter.CheckMediaType(MediaType: PAMMediaType): HResult;
 begin
+  WriteTrace('CheckMediaType.Enter');
+
   // No mediatype, exit with pointer error
   if (MediaType = nil) then
   begin
+    WriteTrace('No mediatype pointer given, exiting!');
     Result := E_POINTER;
     Exit;
   end;
@@ -320,6 +360,7 @@ begin
   // We want only video major types to be supported
   if (not IsEqualGUID(MediaType^.majortype, MEDIATYPE_Video)) then
   begin
+    WriteTrace('Media majortype "'+MGuidToString(MediaType^.majortype)+'" not supported!');
     Result := E_NOTIMPL;
     Exit;
   end;
@@ -327,6 +368,7 @@ begin
   // We want only supported sub types
   if not IsSubTypeSupported(MediaType^.subtype) then
   begin
+    WriteTrace('Media subtype "'+SGuidToString(MediaType^.subtype)+'" not supported!');
     Result := E_NOTIMPL;
     Exit;
   end;
@@ -334,12 +376,15 @@ begin
   // We want only supported format types
   if not IsFormatTypeSupported(MediaType^.formattype) then
   begin
+    WriteTrace('Media formattype "'+FGuidToString(MediaType^.formattype)+'" not supported!');
     Result := E_NOTIMPL;
     Exit;
   end;
 
+  WriteTrace('Check mediatype format pointer');
   Assert(Assigned(MediaType.pbFormat));
 
+  WriteTrace('CheckMediaType.Leave with success');
   Result := NOERROR;
 end;
 
@@ -378,26 +423,33 @@ var
   MPG1: PMPEG1VideoInfo;
   MPG2: PMPEG2VideoInfo;
 begin
+  WriteTrace('SetMediaType.Enter');
+
   // No mediatype, exit with pointer error
   if (MediaType = nil) then
   begin
+    WriteTrace('No mediatype pointer given, exiting!');
     Result := E_POINTER;
     Exit;
   end;
 
   // Release window (Clear data)
+  WriteTrace('Clear');
   DoClear;
 
+  WriteTrace('Check mediatype format pointer');
   Assert(Assigned(MediaType^.pbFormat));
 
   // Copy video info header to FFormat, based on the given format type
   if IsEqualGuid(MediaType.formattype, FORMAT_VideoInfo) then
   begin
+    WriteTrace('Handle video info header');
     VIH := PVIDEOINFOHEADER(MediaType.pbFormat);
     CopyMemory(@fFormat, VIH, SizeOf(TVideoInfoHeader));
   end
   else if IsEqualGuid(MediaType.formattype, FORMAT_VideoInfo2) then
   begin
+    WriteTrace('Handle video info header 2');
     VIH2 := PVIDEOINFOHEADER2(MediaType.pbFormat);
     with VIH2^ do
     begin
@@ -411,24 +463,33 @@ begin
   end
   else if IsEqualGuid(MediaType.formattype, FORMAT_MPEGVideo) then
   begin
+    WriteTrace('Handle mpeg 1 video info');
     MPG1 := PMPEG1VideoInfo(MediaType.pbFormat);
     CopyMemory(@FFormat, @MPG1^.Hdr, SizeOf(TVideoInfoHeader));
   end
   else if IsEqualGuid(MediaType.formattype, FORMAT_MPEG2Video) then
   begin
+    WriteTrace('Handle mpeg 2 video info');
     MPG2 := PMPEG2VideoInfo(MediaType.pbFormat);
     CopyMemory(@FFormat, @MPG2^.Hdr, SizeOf(TVideoInfoHeader));
   end
   else
   begin
+    WriteTrace('Unsupported format type: ' + FGuidToString(MediaType.formattype));
     Result := E_NOTIMPL;
     Exit;
   end;
 
+  WriteTrace('Using major type: ' + MGuidToString(MediaType^.majortype));
+  WriteTrace('Using sub type: ' + SGuidToString(MediaType^.subtype));
+  WriteTrace('Using format type: ' + FGuidToString(MediaType^.formattype));
+
   FWidth  := FFormat.bmiHeader.biWidth;
   FHeight := FFormat.bmiHeader.biHeight;
+  WriteTrace(Format('Using bitmap size: %d x %d', [FWidth, FHeight]));
 
   // Initialize window class
+  WriteTrace('Initialize window class');
   FillChar(FWndClass, SizeOf(TWndClass), #0);
   FWndClass.hInstance := hInstance;
   FWndClass.lpfnWndProc := @WndMessageProc;
@@ -437,21 +498,62 @@ begin
   FWndClass.hCursor := LoadCursor(0, IDC_ARROW);
 
   // Register window class
-  Windows.RegisterClass(FWndClass);
+  WriteTrace('Register window class');
+  if Windows.RegisterClass(FWndClass) = 0 then
+  begin
+    WriteTrace('Window class could not be registered: ' + SysErrorMessage(GetLastError()));
+
+    WriteTrace('Clear');
+    DoClear;
+
+    WriteTrace('Exiting with fail');
+    Result := E_FAIL;
+    Exit;
+  end;
 
   // Create output window
+  WriteTrace('Create window');
   FWnd := CreateWindow(
     FWndClass.lpszClassName,
     'OpenGL Video Renderer',
     WS_CAPTION or WS_THICKFRAME, // NOT Visible
-    0, 0, FWidth, FHeight,
+    0, 0, 320, 240,
     0, 0, hInstance, nil
     );
 
+  // Window could not be created  
+  if FWnd = 0 then
+  begin
+    WriteTrace('Window could not be created: ' + SysErrorMessage(GetLastError()));
+
+    WriteTrace('Clear');
+    DoClear;
+
+    WriteTrace('Exiting with fail');
+    Result := E_FAIL;
+    Exit;
+  end;
+
   // Get device context
+  WriteTrace('Get device context');
   FDC := GetDC(FWnd);
 
+  // Device context could not be detected  
+  if FDC = 0 then
+  begin
+    WriteTrace('Device context could not be created: ' + SysErrorMessage(GetLastError()));
+
+    WriteTrace('Clear');
+    DoClear;
+
+    WriteTrace('Exiting with fail');
+    Result := E_FAIL;
+    Exit;
+  end;
+
   Result := NOERROR;
+
+  WriteTrace('SetMediaType.Leave with success');
 end;
 
 {*** IDispatch methods *** taken from CBaseVideoWindow *** ctlutil.cpp ********}
