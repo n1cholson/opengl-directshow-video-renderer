@@ -807,9 +807,17 @@ begin
 end;
 
 initialization
-  SetLength(SupportedSubTypes, 1);
+  SetLength(SupportedSubTypes, 9);
   SupportedSubTypes[0] := MEDIASUBTYPE_RGB24;
-  
+  SupportedSubTypes[1] := MEDIASUBTYPE_RGB32;
+  SupportedSubTypes[2] := MEDIASUBTYPE_RGB555;
+  SupportedSubTypes[3] := MEDIASUBTYPE_RGB565;
+  SupportedSubTypes[4] := MEDIASUBTYPE_YVYU;
+  SupportedSubTypes[5] := MEDIASUBTYPE_YUY2;
+  SupportedSubTypes[6] := MEDIASUBTYPE_YUYV;
+  SupportedSubTypes[7] := MEDIASUBTYPE_UYVY;
+  SupportedSubTypes[8] := MEDIASUBTYPE_YV12;
+
   SetLength(SupportedFormatTypes, 4);
   SupportedFormatTypes[0] := FORMAT_VideoInfo;
   SupportedFormatTypes[1] := FORMAT_VideoInfo2;
