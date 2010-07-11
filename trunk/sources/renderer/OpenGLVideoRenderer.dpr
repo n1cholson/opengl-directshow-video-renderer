@@ -45,7 +45,9 @@ uses
   conversion in '..\units\conversion.pas',
   dglOpenGL in '..\headers\dglOpenGL.pas',
   VideoRendererFilter in 'VideoRendererFilter.pas',
-  VideoWindow in 'VideoWindow.pas';
+  VideoWindow in 'VideoWindow.pas',
+  settings in 'settings.pas',
+  supports in 'supports.pas';
 
 {$E ax}
 

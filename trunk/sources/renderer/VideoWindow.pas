@@ -36,14 +36,14 @@ uses
   utils,
   conversion,
   glsl,
-  texture;
+  texture,
+  supports,
+  settings;
 
 type
   TFloatRect = record
-    Left,
-    Top,
-    Right,
-    Bottom : Single;
+    Left, Top,
+    Right, Bottom : Single;
   end;
 
 var
@@ -64,24 +64,31 @@ var
   // OpenGL variables
   FRC            : HGLRC;
   FGLInited      : Boolean;
-  FNonPowOfTwo   : Boolean;
   FNumTextures   : Integer;
   FTextures      : array of TTexture;
   FTextureRect   : TFloatRect;
   FUpdateSample  : Boolean;
+
+function FloatRect(ALeft, ATop, ARight, ABottom : Single) : TFloatRect;
+begin
+  Result.Left := ALeft;
+  Result.Top := ATop;
+  Result.Right := ARight;
+  Result.Bottom := ABottom;
+end;
 
 function VideoWindowFormat : TVideoInfoHeader;
 begin
   Result := FFormat;
 end;
 
-procedure DrawQuad(W, H : Integer; TexRect : TFloatRect);
+procedure DrawQuad(W, H : Integer; TR : TFloatRect);
 begin
   glBegin(GL_QUADS);
-  glTexCoord2f(TexRect.Left, TexRect.Top); glVertex3f(0, 0, 0);
-  glTexCoord2f(TexRect.Right, TexRect.Top); glVertex3f(W, 0, 0);
-  glTexCoord2f(TexRect.Right, TexRect.Bottom); glVertex3f(W, H, 0);
-  glTexCoord2f(TexRect.Left, TexRect.Bottom); glVertex3f(0, H, 0);
+  glTexCoord2f(TR.Left, TR.Top); glVertex3f(0, 0, 0);
+  glTexCoord2f(TR.Right, TR.Top); glVertex3f(W, 0, 0);
+  glTexCoord2f(TR.Right, TR.Bottom); glVertex3f(W, H, 0);
+  glTexCoord2f(TR.Left, TR.Bottom); glVertex3f(0, H, 0);
   glEnd;
 end;
 
@@ -113,7 +120,7 @@ begin
     FUpdateSample := False;
     if FNumTextures > 0 then
     begin
-      Convert(FFormat, FSubType, FSample, FSampleS, FTextures[0].Data, FTextures[0].Height);
+      Convert(FFormat, FSubType, FSample, FSampleS, FTextures[0].Data, FTextures[0].Width);
       FTextures[0].Upload(FTextures[0].Data);
     end;
   end;
@@ -234,6 +241,7 @@ begin
 
   FWidth  := Abs(FFormat.bmiHeader.biWidth);
   FHeight := Abs(FFormat.bmiHeader.biHeight);
+  WriteTrace(Format('Bitmap image size: %d x %d', [FFormat.bmiHeader.biWidth, FFormat.bmiHeader.biHeight]));
   WriteTrace(Format('Using image size: %d x %d', [FWidth, FHeight]));
 
   FSubType := AMediaType^.subtype;
@@ -365,8 +373,6 @@ end;
 function CreateOpenGL : Boolean;
 var
   NPOT : TRect;
-  MaxTextureSize : GLint;
-  TexTextureUnits : GLint;
   TexDimW, TexDimH : Integer;
   Target : GLuint;
 begin
@@ -392,39 +398,36 @@ begin
   WriteTrace('Setup opengl');
   SetupOpenGL;
 
+  WriteTrace('Update supports');
+  UpdateSupports;
+
+  WriteTrace('Opengl max texture units: ' + IntToStr(SupportMaxTextureUnits));
+  WriteTrace('Opengl max texture size: ' + IntToStr(SupportMaxTextureSize));
+  WriteTrace('Opengl non power of two supported: ' + BoolToStr(SupportNonPowerOfTwoTextures, True));
+
   // Get max texture units and check for at least 3
-  glGetIntegerv(GL_MAX_TEXTURE_UNITS_ARB, @TexTextureUnits);
-  WriteTrace('Opengl max texture units: ' + IntToStr(TexTextureUnits));
-  if (TexTextureUnits < 0) then
+  if (SupportMaxTextureUnits < 0) then
   begin
     WriteTrace('No opengl texture support!');
     Exit;
   end;
 
   // Get max texture size and check for reached image space
-  glGetIntegerv(GL_MAX_TEXTURE_SIZE, @MaxTextureSize);
-  WriteTrace('Opengl max texture size: ' + IntToStr(MaxTextureSize));
-  if (MaxTextureSize <= 0) or ((FWidth > MaxTextureSize) or (FHeight > MaxTextureSize)) then
+  if (SupportMaxTextureSize <= 0) or ((FWidth > SupportMaxTextureSize) or (FHeight > SupportMaxTextureSize)) then
   begin
     WriteTrace(Format('No opengl texture support for dimension %d x %d!',[FWidth, FHeight]));
     Exit;
   end;
 
-  FNonPowOfTwo := dglCheckExtension('ARB_texture_non_power_of_two');
-  WriteTrace('Opengl non power of two supported: ' + BoolToStr(FNonPowOfTwo, True));
-
-  if not FNonPowOfTwo then
+  if not SupportNonPowerOfTwoTextures then
   begin
     WriteTrace('Calculate non power of two from size: ' + Format('%d x %d',[FWidth, FHeight]));
-    NPOT := NonPowerOfTwo(FWidth, FHeight, MaxTextureSize);
+    NPOT := NonPowerOfTwo(FWidth, FHeight, SupportMaxTextureSize);
     WriteTrace('Non-Power-Of-Two size: ' + Format('%d x %d',[NPOT.Right, NPOT.Bottom]));
-    FTextureRect.Left := 0;
-    FTextureRect.Top := 0;
-    FTextureRect.Right := (1 / NPOT.Right) * FWidth;
-    FTextureRect.Bottom := (1 / NPOT.Bottom) * FHeight;
     TexDimW := NPOT.Right;
     TexDimH := NPOT.Bottom;
     Target := GL_TEXTURE_2D;
+    FTextureRect := FloatRect(0,0,(1 / NPOT.Right) * FWidth,(1 / NPOT.Bottom) * FHeight);
   end
   else
   begin
@@ -444,6 +447,7 @@ begin
   FNumTextures := 1;
   SetLength(FTextures, FNumTextures);
   FTextures[0] := TTexture.Create(Target, GL_RGBA8, GL_BGRA, GL_UNSIGNED_BYTE, TexDimW, TexDimH, TexDimW * TexDimH * 4);
+  FTextures[0].Upload(nil);
 
   // Deactivate rendering context
   WriteTrace('Deactivate rendering context');
@@ -570,14 +574,53 @@ begin
     Result := False;
 end;
 
+procedure SaveSampleToFileSystem(HDR : TVideoInfoHeader; SubType : TGUID; Sample : IMediaSample; Time : Int64);
+var
+  S : String;
+  M : TStream;
+  L : Integer;
+  B : PByte;
+begin
+  S := 'c:\sample_'+SubTypeToString(SubType)+'.data';
+  if not FileExists(S) then
+  begin
+    L := Sample.GetActualDataLength;
+    if Succeeded(Sample.GetPointer(B)) then
+    begin
+      M := TFileStream.Create(S, fmCreate);
+      M.Write(HDR, SizeOf(TVideoInfoHeader));
+      M.Write(SubType, SizeOf(TGUID));
+      M.Write(L, SizeOf(Integer));
+      M.WriteBuffer(B^, L);
+      M.Free;
+    end;
+  end;
+end;
+
+function EncodeReferenceTime(Secs : Double) : Int64;
+begin
+  Result := Trunc(Secs * 10000000);
+end;
+
 procedure UpdateSample(ASample : IMediaSample);
 var
   Bits: PByte;
   R : TRect;
+  S, E : Int64;
 begin
   // Get current sample pointer
   FSampleS := ASample.GetSize;
   ASample.GetPointer(Bits);
+
+  {
+  if Succeeded(ASample.GetTime(S, E)) then
+  begin
+    if S >= EncodeReferenceTime(120) then
+    begin
+      SaveSampleToFileSystem(fFormat, fSubType, ASample, S);
+    end;
+  end;
+  }
 
   // Move sample to sample buffer
   Assert(FSampleS <= FSampleL);
@@ -598,10 +641,11 @@ initialization
   FDC       := 0;
   FRC       := 0;
   FGLInited := False;
+
   FNumTextures := 0;
   SetLength(FTextures, 0);
-  FNonPowOfTwo := False;
   FillChar(FTextureRect, SizeOf(FTextureRect), #0);
+
   FUpdateSample := False;
 
   // Initialize sample variables
