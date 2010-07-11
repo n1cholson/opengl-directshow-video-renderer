@@ -11,11 +11,8 @@ uses
   mainform,
   LResources,
   dshowtypes,
-  texture,
-  conversion,
   sampleloader,
-  glsl,
-  glsldebugform, dglOpenGL;
+  glsldebugform, dglOpenGL, conversion, glsl, texture;
 
 {$IFDEF WINDOWS}{$R glrenderer.rc}{$ENDIF}
 

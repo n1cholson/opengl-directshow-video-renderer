@@ -30,13 +30,17 @@
 
 unit conversion;
 
+{$ifdef FPC}
+  {$mode objfpc}{$H+}
+{$endif}
+
 interface
 
 uses
   Windows,
   SysUtils,
   Dialogs,
-  DirectShow9;
+  {$ifdef FPC}dshowtypes{$else}DirectShow9{$endif};
 
 procedure Convert(AHdr: TVideoInfoHeader; ASubType: TGUID; ASource: PByte;
   ASourceLen: integer; ARGB: PByte; const ATW: integer);
@@ -58,8 +62,6 @@ begin
     Result := 'YVYU'
   else if IsEqualGUID(AGuid, MEDIASUBTYPE_YUY2) then
     Result := 'YUY2'
-  else if IsEqualGUID(AGuid, MEDIASUBTYPE_YUYV) then
-    Result := 'YUYV'
   else if IsEqualGUID(AGuid, MEDIASUBTYPE_UYVY) then
     Result := 'UYVY'
   else if IsEqualGUID(AGuid, MEDIASUBTYPE_YV12) then

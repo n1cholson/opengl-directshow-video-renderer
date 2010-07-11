@@ -440,10 +440,10 @@ begin
 
   WriteTrace('Using texture rect: ' + Format('%f %f %f %f',[FTextureRect.Left, FTextureRect.Top, FTextureRect.Right, FTextureRect.Bottom]));
 
+  WriteTrace('Create single texture (RGBA)');
   FNumTextures := 1;
   SetLength(FTextures, FNumTextures);
   FTextures[0] := TTexture.Create(Target, GL_RGBA8, GL_BGRA, GL_UNSIGNED_BYTE, TexDimW, TexDimH, TexDimW * TexDimH * 4);
-  WriteTrace('Texture id: ' + IntToStr(FTextures[0].ID));
 
   // Deactivate rendering context
   WriteTrace('Deactivate rendering context');
