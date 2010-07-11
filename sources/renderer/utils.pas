@@ -157,6 +157,8 @@ begin
     Result := 'MEDIASUBTYPE_AI44'
   else if IsEqualGuid(_GUID, MEDIASUBTYPE_IA44) then
     Result := 'MEDIASUBTYPE_IA44'
+  else if IsEqualGuid(_GUID, MEDIASUBTYPE_YV12) then
+    Result := 'MEDIASUBTYPE_YV12'
   else
     Result := GUIDToString(_GUID);
 end;

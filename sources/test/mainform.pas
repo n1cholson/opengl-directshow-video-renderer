@@ -442,8 +442,6 @@ var
   d : Int64;
   NPOT : TRect;
   TW, TH : Integer;
-  DataPos : Integer;
-  DestData : PByte;
 begin
   if FSelSample > -1 then
   begin
@@ -458,7 +456,6 @@ begin
         TW := W;
         TH := H;
         FTextureRect := FloatRect(0,0,TW,TH);
-        DataPos := 0;
       end
       else
       begin
@@ -466,8 +463,6 @@ begin
         TW := NPOT.Right;
         TH := NPOT.Bottom;
         FTextureRect := FloatRect(0,0,(1 / TW) * W,(1 / TH) * H);
-        DataPos := 0;
-        Inc(DataPos, (TW - W) * (TH - H) * 4);
       end;
 
       // Release textures

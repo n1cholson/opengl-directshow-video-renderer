@@ -270,7 +270,7 @@ begin
   else if IsEqualGuid(ASubType, MEDIASUBTYPE_YV12) then
   begin
     ArraySize := AHdr.bmiHeader.biHeight * AHdr.bmiHeader.biWidth;
-    for Y := AHdr.bmiHeader.biHeight - 1 downto 0 do
+    for Y := 0 to AHdr.bmiHeader.biHeight - 1 do
     begin
       Dst := PByte(UInt64(ARGB) + (Y * DstLineWidth));
       for X := 0 to AHdr.bmiHeader.biWidth - 1 do
