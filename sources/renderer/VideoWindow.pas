@@ -38,6 +38,14 @@ uses
   glsl,
   texture;
 
+type
+  TFloatRect = record
+    Left,
+    Top,
+    Right,
+    Bottom : Single;
+  end;
+
 var
   // Window variables
   FWndClass : TWndClassEx;
@@ -54,21 +62,26 @@ var
   FSampleS  : Integer; // Current sample size
 
   // OpenGL variables
-  FRC       : HGLRC;
-  FGLInited : Boolean;
+  FRC            : HGLRC;
+  FGLInited      : Boolean;
+  FNonPowOfTwo   : Boolean;
+  FNumTextures   : Integer;
+  FTextures      : array of TTexture;
+  FTextureRect   : TFloatRect;
+  FUpdateSample  : Boolean;
 
 function VideoWindowFormat : TVideoInfoHeader;
 begin
   Result := FFormat;
 end;
 
-procedure DrawQuad(W, H, TW, TH: integer);
+procedure DrawQuad(W, H : Integer; TexRect : TFloatRect);
 begin
   glBegin(GL_QUADS);
-  glTexCoord2f(0, 0); glVertex3f(0, H, 0);
-  glTexCoord2f(TW, 0); glVertex3f(W, H, 0);
-  glTexCoord2f(TW, TH); glVertex3f(W, 0, 0);
-  glTexCoord2f(0, TH); glVertex3f(0, 0, 0);
+  glTexCoord2f(TexRect.Left, TexRect.Top); glVertex3f(0, 0, 0);
+  glTexCoord2f(TexRect.Right, TexRect.Top); glVertex3f(W, 0, 0);
+  glTexCoord2f(TexRect.Right, TexRect.Bottom); glVertex3f(W, H, 0);
+  glTexCoord2f(TexRect.Left, TexRect.Bottom); glVertex3f(0, H, 0);
   glEnd;
 end;
 
@@ -94,8 +107,27 @@ begin
   glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT);
   glLoadIdentity;
 
-  glColor3f(1,0,0);
-  DrawQuad(W, H, 1, 1);
+  // Update sample
+  if FUpdateSample then
+  begin
+    FUpdateSample := False;
+    if FNumTextures > 0 then
+    begin
+      Convert(FFormat, FSubType, FSample, FSampleS, FTextures[0].Data, FTextures[0].Height);
+      FTextures[0].Upload(FTextures[0].Data);
+    end;
+  end;
+
+  glColor3f(1,1,1);
+  if FNumTextures > 0 then
+    FTextures[0].Bind()
+  else
+    glDisable(GL_TEXTURE_2D);
+
+  DrawQuad(W, H, FTextureRect);
+
+  if FNumTextures > 0 then
+    FTextures[0].Unbind();
 
   SwapBuffers(FDC);
   glFinish;
@@ -331,6 +363,12 @@ begin
 end;
 
 function CreateOpenGL : Boolean;
+var
+  NPOT : TRect;
+  MaxTextureSize : GLint;
+  TexTextureUnits : GLint;
+  TexDimW, TexDimH : Integer;
+  Target : GLuint;
 begin
   WriteTrace('CreateOpenGL.Enter');
   Result := False;
@@ -354,6 +392,59 @@ begin
   WriteTrace('Setup opengl');
   SetupOpenGL;
 
+  // Get max texture units and check for at least 3
+  glGetIntegerv(GL_MAX_TEXTURE_UNITS_ARB, @TexTextureUnits);
+  WriteTrace('Opengl max texture units: ' + IntToStr(TexTextureUnits));
+  if (TexTextureUnits < 0) then
+  begin
+    WriteTrace('No opengl texture support!');
+    Exit;
+  end;
+
+  // Get max texture size and check for reached image space
+  glGetIntegerv(GL_MAX_TEXTURE_SIZE, @MaxTextureSize);
+  WriteTrace('Opengl max texture size: ' + IntToStr(MaxTextureSize));
+  if (MaxTextureSize <= 0) or ((FWidth > MaxTextureSize) or (FHeight > MaxTextureSize)) then
+  begin
+    WriteTrace(Format('No opengl texture support for dimension %d x %d!',[FWidth, FHeight]));
+    Exit;
+  end;
+
+  FNonPowOfTwo := dglCheckExtension('ARB_texture_non_power_of_two');
+  WriteTrace('Opengl non power of two supported: ' + BoolToStr(FNonPowOfTwo, True));
+
+  if not FNonPowOfTwo then
+  begin
+    WriteTrace('Calculate non power of two from size: ' + Format('%d x %d',[FWidth, FHeight]));
+    NPOT := NonPowerOfTwo(FWidth, FHeight, MaxTextureSize);
+    WriteTrace('Non-Power-Of-Two size: ' + Format('%d x %d',[NPOT.Right, NPOT.Bottom]));
+    FTextureRect.Left := 0;
+    FTextureRect.Top := 0;
+    FTextureRect.Right := (1 / NPOT.Right) * FWidth;
+    FTextureRect.Bottom := (1 / NPOT.Bottom) * FHeight;
+    TexDimW := NPOT.Right;
+    TexDimH := NPOT.Bottom;
+    Target := GL_TEXTURE_2D;
+  end
+  else
+  begin
+    WriteTrace('Using non power of two size: ' + Format('%d x %d',[FWidth, FHeight]));
+    FTextureRect.Left := 0;
+    FTextureRect.Top := 0;
+    FTextureRect.Right := FWidth;
+    FTextureRect.Bottom := FHeight;
+    TexDimW := FWidth;
+    TexDimH := FHeight;
+    Target := GL_TEXTURE_RECTANGLE_ARB;
+  end;
+
+  WriteTrace('Using texture rect: ' + Format('%f %f %f %f',[FTextureRect.Left, FTextureRect.Top, FTextureRect.Right, FTextureRect.Bottom]));
+
+  FNumTextures := 1;
+  SetLength(FTextures, FNumTextures);
+  FTextures[0] := TTexture.Create(Target, GL_RGBA8, GL_BGRA, GL_UNSIGNED_BYTE, TexDimW, TexDimH, TexDimW * TexDimH * 4);
+  WriteTrace('Texture id: ' + IntToStr(FTextures[0].ID));
+
   // Deactivate rendering context
   WriteTrace('Deactivate rendering context');
   DeactivateRenderingContext;
@@ -364,8 +455,20 @@ begin
 end;
 
 procedure ReleaseOpenGL;
+var
+  I : Integer;
 begin
   FGLInited := False;
+
+  // Release textures
+  if FNumTextures > 0 then
+  begin
+    WriteTrace(Format('Release %d textures',[FNumTextures]));
+    For I := 0 to FNumTextures-1 do
+      FTextures[I].Free;
+    FNumTextures := 0;
+    SetLength(FTextures, 0);
+  end;
 
   // Release rendering context
   if FRC <> 0 then
@@ -480,6 +583,9 @@ begin
   Assert(FSampleS <= FSampleL);
   Move(Bits^, FSample^, FSampleS);
 
+  // Update sample flag
+  FUpdateSample := True;
+
   // Paint window
   Windows.GetClientRect(FWnd, R);
   InvalidateRect(FWnd, @R, False);
@@ -492,6 +598,11 @@ initialization
   FDC       := 0;
   FRC       := 0;
   FGLInited := False;
+  FNumTextures := 0;
+  SetLength(FTextures, 0);
+  FNonPowOfTwo := False;
+  FillChar(FTextureRect, SizeOf(FTextureRect), #0);
+  FUpdateSample := False;
 
   // Initialize sample variables
   WriteTrace('Clear data');

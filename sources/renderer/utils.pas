@@ -32,6 +32,9 @@ unit utils;
 
 interface
 
+uses
+  Windows;
+
 {$include videorenderer_compiler.inc}
 
 procedure WriteTrace(_Line : WideString);
@@ -42,11 +45,12 @@ function MGuidToString(_GUID : TGUID) : String;
 function FGuidToString(_GUID : TGUID) : String;
 function SGuidToString(_GUID : TGUID) : String;
 
+function NonPowerOfTwo(AWidth, AHeight, AMax : Integer) : TRect;
+
 implementation
 
 uses
   // Delphi
-  Windows,
   Messages,
   SysUtils,
 
@@ -284,5 +288,20 @@ procedure WriteTrace(_Line : WideString);
 begin
 end;
 {$endif}
+
+function GetNonPowerOfTwo(AValue, AMax : Integer) : Integer;
+begin
+  Result := 2;
+  while (Result < AValue) and (Result < AMax) do
+    Result := Result * 2;
+end;
+
+function NonPowerOfTwo(AWidth, AHeight, AMax : Integer) : TRect;
+begin
+  Result.Left := 0;
+  Result.Top := 0;
+  Result.Right := GetNonPowerOfTwo(AWidth, AMax);
+  Result.Bottom := GetNonPowerOfTwo(AHeight, AMax);
+end;
 
 end.
