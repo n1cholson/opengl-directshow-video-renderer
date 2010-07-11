@@ -10,13 +10,12 @@ uses
   Forms,
   mainform,
   LResources,
-  dglopengl in '..\headers\dglopengl.pas',
   dshowtypes,
   texture,
   conversion,
   sampleloader,
   glsl,
-  glsldebugform;
+  glsldebugform, dglOpenGL;
 
 {$IFDEF WINDOWS}{$R glrenderer.rc}{$ENDIF}
 
@@ -29,6 +28,7 @@ begin
   frmGLSLDebug.Left := (frmMain.Left + frmMain.Width);
   frmGLSLDebug.Top := frmMain.Top;
 
-  Application.Run;
+  if not frmMain.NotSupported then
+    Application.Run;
 end.
 

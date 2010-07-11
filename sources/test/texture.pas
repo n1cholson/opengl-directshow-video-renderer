@@ -166,7 +166,8 @@ begin
     Exit;
   FActive := True;
   glEnable(FTarget);
-  glActiveTexture(GL_TEXTURE0 + AIndex);
+  if Assigned(glActiveTexture) then
+    glActiveTexture(GL_TEXTURE0 + AIndex);
   glBindTexture(FTarget, FID);
 end;
 
@@ -175,7 +176,8 @@ begin
   if not FActive then
     Exit;
   FActive := False;
-  glActiveTexture(GL_TEXTURE0 + AIndex);
+  if Assigned(glActiveTexture) then
+    glActiveTexture(GL_TEXTURE0 + AIndex);
   glBindTexture(FTarget, 0);
   glDisable(FTarget);
 end;
