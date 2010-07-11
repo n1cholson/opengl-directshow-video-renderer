@@ -31,6 +31,10 @@ uses
   glsl;
 
 type
+  TFloatRect = record
+    Left, Top,
+    Right, Bottom : Single;
+  end;
 
   { TfrmMain }
 
@@ -47,6 +51,8 @@ type
     procedure MenuItem1Click(Sender: TObject);
   private
     { private declarations }
+    FNotSupported : Boolean;
+
     FDC: HDC;
     FRC: HGLRC;
     FGLInited : Boolean;
@@ -57,6 +63,8 @@ type
     FCurSample:  integer;
     FSamChange: Boolean;
     FNoGLSL: Boolean;
+
+    FTextureRect : TFloatRect;
 
     FVideoTex:  TTexture;
     FVideoTexY:  TTexture;
@@ -70,17 +78,23 @@ type
 
     FTextureFilter : Integer;
 
+    FGLSLSupported: Boolean;
+    FNonPowerOfTwoSupported : Boolean;
+    FMaxTextureSize : Integer;
+
     procedure ReleaseTextures;
     procedure ReleaseShaders;
 
     procedure SetupOpenGL;
 
-    procedure SetTextureFilter;
+    procedure SetTextureFilter(AMode : GLUint);
     procedure DrawFrame;
     procedure UpdateSample;
   public
     { public declarations }
     procedure PosChanged(var AMsg : TWMWindowPosChanged); message WM_WINDOWPOSCHANGED;
+  published
+    property NotSupported : Boolean read FNotSupported;
   end;
 
 var
@@ -90,6 +104,29 @@ implementation
 
 uses
   conversion, dshowtypes, glsldebugform;
+
+function FloatRect(ALeft, ATop, ARight, ABottom : Single) : TFloatRect;
+begin
+  Result.Left := ALeft;
+  Result.Top := ATop;
+  Result.Right := ARight;
+  Result.Bottom := ABottom;
+end;
+
+function GetNonPowerOfTwo(AValue, AMax : Integer) : Integer;
+begin
+  Result := 2;
+  while (Result < AValue) and (Result < AMax) do
+    Result := Result * 2;
+end;
+
+function NonPowerOfTwo(AWidth, AHeight, AMax : Integer) : TRect;
+begin
+  Result.Left := 0;
+  Result.Top := 0;
+  Result.Right := GetNonPowerOfTwo(AWidth, AMax);
+  Result.Bottom := GetNonPowerOfTwo(AHeight, AMax);
+end;
 
 function FileToString(AFilename: string): string;
 var
@@ -134,6 +171,8 @@ var
   doshutdown : Boolean;
   i : Integer;
 begin
+  FNotSupported := False;
+
   // Initialize samples
   FNumSamples := 0;
   SetLength(FSamples, 0);
@@ -143,6 +182,7 @@ begin
   FNoGLSL := False;
 
   FGLInited := False;
+  FTextureRect := FloatRect(0,0,0,0);
 
   // Load samples
   LoadSamples(IncludeTrailingPathDelimiter(ExtractFilePath(Application.ExeName)) +
@@ -162,14 +202,27 @@ begin
   ActivateRenderingContext(FDC, FRC);
   SetupOpenGL;
 
+  FNonPowerOfTwoSupported := dglCheckExtension('GL_ARB_texture_rectangle');
+  FMaxTextureSize := 0;
+  glGetIntegerv(GL_MAX_TEXTURE_SIZE, @FMaxTextureSize);
+
   // Shut down
   missingExtensions := TStringList.Create;
+  {
   doshutdown := not ExtensionAreSupported(missingExtensions, [
     'GL_ARB_shader_objects',
     'GL_ARB_vertex_shader',
     'GL_ARB_fragment_shader',
     'GL_ARB_shading_language_100',
     'GL_ARB_texture_rectangle']);
+  }
+  doshutdown := False;
+
+  FGLSLSupported :=
+    dglCheckExtension('GL_ARB_shader_objects') and
+    dglCheckExtension('GL_ARB_vertex_shader') and
+    dglCheckExtension('GL_ARB_fragment_shader') and
+    dglCheckExtension('GL_ARB_shading_language_100');
 
   s := 'The following opengl extension are not supported by your graphics card but needed for this application to run:'+#13#10;
   for I := 0 to missingExtensions.Count-1 do
@@ -179,7 +232,7 @@ begin
   if doshutdown then
   begin
     MessageBox(Handle, PChar(s), 'GL Sample Renderer', MB_OK or MB_ICONEXCLAMATION);
-    Application.Terminate;
+    FNotSupported := True;
   end;
 
   // No texture filtering by default
@@ -263,9 +316,9 @@ begin
     Inc(FTextureFilter);
     if FTextureFilter > 1 then FTextureFilter := 0;
   end;
-  if Key = Ord('G') then
+  if (Key = Ord('G')) and (FGLSLSupported) then
   begin
-    FNoGLSL := not FNoGLSL;
+    FNoGLSL := (not FNoGLSL);
     FSamChange := True;
   end;
   if Key = Ord('R') then
@@ -299,13 +352,13 @@ begin
     frmGLSLDebug.Show;
 end;
 
-procedure DrawQuad(W, H, TW, TH: integer);
+procedure DrawQuad(W, H : Integer; TR : TFloatRect);
 begin
   glBegin(GL_QUADS);
-  glTexCoord2f(0, 0); glVertex3f(0, H, 0);
-  glTexCoord2f(TW, 0); glVertex3f(W, H, 0);
-  glTexCoord2f(TW, TH); glVertex3f(W, 0, 0);
-  glTexCoord2f(0, TH); glVertex3f(0, 0, 0);
+  glTexCoord2f(TR.Left, TR.Top); glVertex3f(0, 0, 0);
+  glTexCoord2f(TR.Right, TR.Top); glVertex3f(W, 0, 0);
+  glTexCoord2f(TR.Right, TR.Bottom); glVertex3f(W, H, 0);
+  glTexCoord2f(TR.Left, TR.Bottom); glVertex3f(0, H, 0);
   glEnd;
 end;
 
@@ -387,6 +440,10 @@ var
   W, H: integer;
   s : String;
   d : Int64;
+  NPOT : TRect;
+  TW, TH : Integer;
+  DataPos : Integer;
+  DestData : PByte;
 begin
   if FSelSample > -1 then
   begin
@@ -395,6 +452,23 @@ begin
       // Save texture dimensions
       W := FSamples[FSelSample]^.Header.VIH.bmiHeader.biWidth;
       H := FSamples[FSelSample]^.Header.VIH.bmiHeader.biHeight;
+
+      if FNonPowerOfTwoSupported then
+      begin
+        TW := W;
+        TH := H;
+        FTextureRect := FloatRect(0,0,TW,TH);
+        DataPos := 0;
+      end
+      else
+      begin
+        NPOT := NonPowerOfTwo(W, H, FMaxTextureSize);
+        TW := NPOT.Right;
+        TH := NPOT.Bottom;
+        FTextureRect := FloatRect(0,0,(1 / TW) * W,(1 / TH) * H);
+        DataPos := 0;
+        Inc(DataPos, (TW - W) * (TH - H) * 4);
+      end;
 
       // Release textures
       ReleaseTextures;
@@ -408,7 +482,7 @@ begin
                    IsEqualGuid(FSamples[FSelSample]^.Header.SubType, MEDIASUBTYPE_YVYU) or
                    IsEqualGuid(FSamples[FSelSample]^.Header.SubType, MEDIASUBTYPE_UYVY) or
                    IsEqualGuid(FSamples[FSelSample]^.Header.SubType, MEDIASUBTYPE_YV12)
-                  ) and (not FNoGLSL);
+                  ) and (not FNoGLSL) and FGLSLSupported;
 
       // Clear debug infos
       frmGLSLDebug.memDebug.Lines.Clear;
@@ -416,7 +490,9 @@ begin
       // Show infos
       frmGLSLDebug.memDebug.Lines.Add('OpenGL Version: ' + glGetString(GL_VERSION));
       frmGLSLDebug.memDebug.Lines.Add('OpenGL Vendor: ' + glGetString(GL_VENDOR));
-      frmGLSLDebug.memDebug.Lines.Add('GLSL Version: ' + glGetString(GL_SHADING_LANGUAGE_VERSION));
+      frmGLSLDebug.memDebug.Lines.Add('OpenGL Max Texture Size: ' + IntToStr(FMaxTextureSize));
+      if FGLSLSupported then
+        frmGLSLDebug.memDebug.Lines.Add('GLSL Version: ' + glGetString(GL_SHADING_LANGUAGE_VERSION));
       frmGLSLDebug.memDebug.Lines.Add('');
       frmGLSLDebug.memDebug.Lines.Add('Sample dimension: ' + Format('%d x %d',[W, H]));
       frmGLSLDebug.memDebug.Lines.Add('Sample bitcount: ' + Format('%d',[FSamples[FSelSample]^.Header.VIH.bmiHeader.biBitCount]));
@@ -433,7 +509,10 @@ begin
       else
       begin
         // Create RGBA texture
-        FVideoTex  := TTexture.Create(GL_TEXTURE_RECTANGLE, GL_RGBA8, GL_BGRA, GL_UNSIGNED_BYTE, W, H, W * H * 4);
+        if FNonPowerOfTwoSupported then
+          FVideoTex  := TTexture.Create(GL_TEXTURE_RECTANGLE, GL_RGBA8, GL_BGRA, GL_UNSIGNED_BYTE, TW, TH, TW * TH * 4)
+        else
+          FVideoTex  := TTexture.Create(GL_TEXTURE_2D, GL_RGBA8, GL_BGRA, GL_UNSIGNED_BYTE, TW, TH, TW * TH * 4);
       end;
 
       if FUseGLSL then
@@ -518,7 +597,7 @@ begin
           FSamples[FSelSample]^.Header.SubType,
           FSamples[FSelSample]^.Data,
           FSamples[FSelSample]^.Header.DataLength,
-          FVideoTex.Data);
+          FVideoTex.Data, TW);
         frmGLSLDebug.memDebug.Lines.Add(Format('Software color conversion done in: %d msecs',[GetTickCount-d]));
 
         // Upload texture
@@ -564,17 +643,17 @@ begin
   end;
 end;
 
-procedure TfrmMain.SetTextureFilter;
+procedure TfrmMain.SetTextureFilter(AMode : GLUint);
 begin
   if FTextureFilter = 1 then
   begin
-    glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(AMode, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(AMode, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   end
   else
   begin
-    glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(AMode, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(AMode, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   end;
 end;
 
@@ -608,17 +687,17 @@ begin
     if FVideoTexY <> nil then
     begin
       FVideoTexY.Bind(0);
-      SetTextureFilter;
+      SetTextureFilter(FVideoTexY.Target);
     end;
     if FVideoTexU <> nil then
     begin
       FVideoTexU.Bind(1);
-      SetTextureFilter;
+      SetTextureFilter(FVideoTexU.Target);
     end;
     if FVideoTexV <> nil then
     begin
       FVideoTexV.Bind(2);
-      SetTextureFilter;
+      SetTextureFilter(FVideoTexV.Target);
     end;
 
     FYuvShader.Bind;
@@ -630,11 +709,10 @@ begin
   else
   begin
     FVideoTex.Bind;
-    SetTextureFilter;
-    glUseProgram(0);
+    SetTextureFilter(FVideoTex.Target);
   end;
 
-  DrawQuad(W, H - Statusbar1.Height, TW, TH);
+  DrawQuad(W, H - Statusbar1.Height, FTextureRect);
 
   if FUseGLSL then
   begin
