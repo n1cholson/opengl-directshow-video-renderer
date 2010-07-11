@@ -40,11 +40,11 @@ library OpenGLVideoRenderer;
 uses
   BaseClass,
   utils in 'utils.pas',
-  texture in 'texture.pas',
-  glsl in 'glsl.pas',
+  texture in '..\units\texture.pas',
+  glsl in '..\units\glsl.pas',
+  conversion in '..\units\conversion.pas',
   dglOpenGL in '..\headers\dglOpenGL.pas',
   VideoRendererFilter in 'VideoRendererFilter.pas',
-  conversion in 'conversion.pas',
   VideoWindow in 'VideoWindow.pas';
 
 {$E ax}

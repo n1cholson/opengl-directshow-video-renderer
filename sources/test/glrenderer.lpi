@@ -44,41 +44,41 @@
         <UnitName Value="mainform"/>
       </Unit1>
       <Unit2>
-        <Filename Value="conversion.pas"/>
-        <IsPartOfProject Value="True"/>
-        <UnitName Value="conversion"/>
-      </Unit2>
-      <Unit3>
         <Filename Value="dshowtypes.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="dshowtypes"/>
-      </Unit3>
-      <Unit4>
+      </Unit2>
+      <Unit3>
         <Filename Value="sampleloader.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="sampleloader"/>
-      </Unit4>
-      <Unit5>
-        <Filename Value="texture.pas"/>
-        <IsPartOfProject Value="True"/>
-        <UnitName Value="texture"/>
-      </Unit5>
-      <Unit6>
-        <Filename Value="glsl.pas"/>
-        <IsPartOfProject Value="True"/>
-        <UnitName Value="glsl"/>
-      </Unit6>
-      <Unit7>
+      </Unit3>
+      <Unit4>
         <Filename Value="glsldebugform.pas"/>
         <IsPartOfProject Value="True"/>
         <ComponentName Value="frmGLSLDebug"/>
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="glsldebugform"/>
-      </Unit7>
-      <Unit8>
+      </Unit4>
+      <Unit5>
         <Filename Value="..\headers\dglOpenGL.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="dglOpenGL"/>
+      </Unit5>
+      <Unit6>
+        <Filename Value="..\units\conversion.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="conversion"/>
+      </Unit6>
+      <Unit7>
+        <Filename Value="..\units\glsl.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="glsl"/>
+      </Unit7>
+      <Unit8>
+        <Filename Value="..\units\texture.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="texture"/>
       </Unit8>
     </Units>
   </ProjectOptions>
@@ -87,7 +87,7 @@
     <PathDelim Value="\"/>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)\"/>
-      <OtherUnitFiles Value="C:\DevProjects\opengl directshow video renderer\sources\headers\"/>
+      <OtherUnitFiles Value="C:\DevProjects\opengl directshow video renderer\sources\headers\;C:\DevProjects\opengl directshow video renderer\sources\units\"/>
     </SearchPaths>
     <Linking>
       <Options>

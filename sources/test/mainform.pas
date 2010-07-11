@@ -660,11 +660,10 @@ end;
 procedure TfrmMain.DrawFrame;
 var
   W, H:   integer;
-  TW, TH: integer;
+  TH: integer;
 begin
   W  := ClientWidth;
   H  := ClientHeight;
-  TW := FSamples[FSelSample]^.Header.VIH.bmiHeader.biWidth;
   TH := FSamples[FSelSample]^.Header.VIH.bmiHeader.biHeight;
 
   glViewPort(0, 0, W, H);
