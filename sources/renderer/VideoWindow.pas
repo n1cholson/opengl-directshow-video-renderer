@@ -69,13 +69,19 @@ var
   FSampleS  : Integer; // Current sample size
 
   // OpenGL variables
-  FRC            : HGLRC;
-  FGLInited      : Boolean;
-  FNumTextures   : Integer;
-  FOpenGLCaps    : String;
-  FTextures      : array of TTexture;
-  FTextureRect   : TFloatRect;
-  FUpdateSample  : Boolean;
+  FRC             : HGLRC;
+  FGLInited       : Boolean;
+  FOpenGLCaps     : String;
+
+  FTextureTarget  : GLuint;
+  FTextureDim     : TRect;
+
+  FUpdateSample   : Boolean;
+  FReloadTextures : Boolean;
+
+  FNumTextures    : Integer;
+  FTextures       : array of TTexture;
+  FTextureRect    : TFloatRect;
 
 function FloatRect(ALeft, ATop, ARight, ABottom : Single) : TFloatRect;
 begin
@@ -100,6 +106,33 @@ begin
   glEnd;
 end;
 
+procedure ClearTextures;
+var
+  I : Integer;
+begin
+  // Release textures
+  if FNumTextures > 0 then
+  begin
+    WriteTrace(Format('Release %d textures',[FNumTextures]));
+    For I := 0 to FNumTextures-1 do
+      FTextures[I].Free;
+    FNumTextures := 0;
+    SetLength(FTextures, 0);
+  end;
+end;
+
+procedure CreateTextures;
+begin
+  if SettingSoftwareColorConversion then
+  begin
+    WriteTrace('Create single texture (RGBA)');
+    FNumTextures := 1;
+    SetLength(FTextures, FNumTextures);
+    FTextures[0] := TTexture.Create(FTextureTarget, GL_RGBA8, GL_BGRA, GL_UNSIGNED_BYTE, FTextureDim.Right, FTextureDim.Bottom, FTextureDim.Right * FTextureDim.Bottom * 4);
+    FTextures[0].Upload(nil);
+  end;
+end;
+
 procedure DrawOpenGL(AClientRect : TRect);
 var
   W, H : Integer;
@@ -121,6 +154,17 @@ begin
 
   glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT);
   glLoadIdentity;
+
+  // Reload textures
+  if FReloadTextures then
+  begin
+    WriteTrace('Reload textures');
+    FReloadTextures := False;
+    // Clear textures
+    ClearTextures;
+    // Create textures
+    CreateTextures;
+  end;
 
   // Update sample
   if FUpdateSample then
@@ -154,7 +198,18 @@ end;
 procedure PaintVideoWindow;
 var
   R : TRect;
+  FPS : Double;
 begin
+  if (FFrameDrop > 0) and (SettingEnableFrameDrop) then
+  begin
+    Inc(FFramesDropped);
+    Dec(FFrameDrop);
+    Exit;
+  end;
+
+  if Assigned(FFrameDurCounter) then
+    FFrameDurCounter.Start;
+
   Windows.GetClientRect(FWnd, R);
   if FGLInited then
     DrawOpenGL(R)
@@ -174,48 +229,38 @@ begin
     else
       FillRect(FDC, Rect(0, 0, R.Right - R.Left, R.Bottom - R.Top), HBRUSH(COLOR_BTNFACE));
   end;
+
+  Inc(FFrames);
+
+  if Assigned(FFrameDurCounter) then
+    FFrameDurCounter.Stop;
+
+  // Frame drop
+  if Assigned(FFrameDurCounter) then
+    if FFrameDurCounter.Seconds > (1 / FFrameRate) then
+      Inc(FFrameDrop);
+
+  if (GetTickCount - FFpsCounter) > 1000 then
+  begin
+    // Display fps
+    Fps := (FFrames * 1000) / (GetTickCount - FFpsCounter);
+    SetWindowText(FWnd, PChar(Format('OpenGL Video Renderer (%s) Fps: %.2f, Framedrop: %d/%d',[FOpenGLCaps, Fps, FFrameDrop, FFramesDropped])));
+    FFpsCounter := GetTickCount;
+    FFrames := 0;
+  end;
 end;
 
 function WndMessageProc(AhWnd: HWND; AMsg: UINT; AWParam: WPARAM; ALParam: LPARAM): UINT; stdcall;
 var
   PS : TPaintStruct;
-  FPS : Double;
 begin
-  if AMsg = WM_PAINT then
+  if (AMsg = WM_PAINT) and (SettingDrawOnPaint) then
   begin
     Result := 0;
-
-    if (FFrameDrop > 0) and (SettingEnableFrameDrop) then
-    begin
-      Inc(FFramesDropped);
-      Dec(FFrameDrop);
-      Exit;
-    end;
-    
-    if Assigned(FFrameDurCounter) then
-      FFrameDurCounter.Start;
 
     BeginPaint(FWnd, PS);
     PaintVideoWindow;
     EndPaint(FWnd, PS);
-    Inc(FFrames);
-
-    if Assigned(FFrameDurCounter) then
-      FFrameDurCounter.Stop;
-
-    // Frame drop
-    if Assigned(FFrameDurCounter) then
-      if FFrameDurCounter.Seconds > (1 / FFrameRate) then
-        Inc(FFrameDrop);
-
-    if (GetTickCount - FFpsCounter) > 1000 then
-    begin
-      // Display fps
-      Fps := (FFrames * 1000) / (GetTickCount - FFpsCounter);
-      SetWindowText(FWnd, PChar(Format('OpenGL Video Renderer (%s) Fps: %.2f, Framedrop: %d/%d',[FOpenGLCaps, Fps, FFrameDrop, FFramesDropped])));
-      FFpsCounter := GetTickCount;
-      FFrames := 0;
-    end;
   end
   else
     Result := DefWindowProc(AhWnd,AMsg,AwParam,AlParam);
@@ -435,8 +480,6 @@ end;
 function CreateOpenGL : Boolean;
 var
   NPOT : TRect;
-  TexDimW, TexDimH : Integer;
-  Target : GLuint;
 begin
   WriteTrace('CreateOpenGL.Enter');
   Result := False;
@@ -486,9 +529,9 @@ begin
     WriteTrace('Calculate non power of two from size: ' + Format('%d x %d',[FWidth, FHeight]));
     NPOT := NonPowerOfTwo(FWidth, FHeight, SupportMaxTextureSize);
     WriteTrace('Non-Power-Of-Two size: ' + Format('%d x %d',[NPOT.Right, NPOT.Bottom]));
-    TexDimW := NPOT.Right;
-    TexDimH := NPOT.Bottom;
-    Target := GL_TEXTURE_2D;
+    FTextureDim.Right := NPOT.Right;
+    FTextureDim.Bottom := NPOT.Bottom;
+    FTextureTarget := GL_TEXTURE_2D;
     FTextureRect := FloatRect(0,0,(1 / NPOT.Right) * FWidth,(1 / NPOT.Bottom) * FHeight);
   end
   else
@@ -498,18 +541,21 @@ begin
     FTextureRect.Top := 0;
     FTextureRect.Right := FWidth;
     FTextureRect.Bottom := FHeight;
-    TexDimW := FWidth;
-    TexDimH := FHeight;
-    Target := GL_TEXTURE_RECTANGLE_ARB;
+    FTextureDim.Right := FWidth;
+    FTextureDim.Bottom := FHeight;
+    FTextureTarget := GL_TEXTURE_RECTANGLE_ARB;
   end;
 
-  WriteTrace('Using texture rect: ' + Format('%f %f %f %f',[FTextureRect.Left, FTextureRect.Top, FTextureRect.Right, FTextureRect.Bottom]));
+  // Detect settings
+  SettingSoftwareColorConversion := not SupportGLSL;
+  SettingEnableFrameDrop := True;
+  SettingDrawOnPaint := True;
 
-  WriteTrace('Create single texture (RGBA)');
-  FNumTextures := 1;
-  SetLength(FTextures, FNumTextures);
-  FTextures[0] := TTexture.Create(Target, GL_RGBA8, GL_BGRA, GL_UNSIGNED_BYTE, TexDimW, TexDimH, TexDimW * TexDimH * 4);
-  FTextures[0].Upload(nil);
+  // Force reloading textures
+  FReloadTextures := True;
+
+  WriteTrace('Using texture rect: ' + Format('%f %f %f %f',[FTextureRect.Left, FTextureRect.Top, FTextureRect.Right, FTextureRect.Bottom]));
+  WriteTrace('Using texture dimension: ' + Format('%d x %d',[FTextureDim.Right, FTextureDim.Bottom]));
 
   // Deactivate rendering context
   WriteTrace('Deactivate rendering context');
@@ -522,21 +568,12 @@ begin
 end;
 
 procedure ReleaseOpenGL;
-var
-  I : Integer;
 begin
   FGLInited := False;
   FOpenGLCaps := '';
 
-  // Release textures
-  if FNumTextures > 0 then
-  begin
-    WriteTrace(Format('Release %d textures',[FNumTextures]));
-    For I := 0 to FNumTextures-1 do
-      FTextures[I].Free;
-    FNumTextures := 0;
-    SetLength(FTextures, 0);
-  end;
+  // Clear textures
+  ClearTextures;
 
   // Release rendering context
   if FRC <> 0 then
@@ -670,7 +707,7 @@ procedure UpdateSample(ASample : IMediaSample);
 var
   Bits: PByte;
   R : TRect;
-  S, E : Int64;
+{  S, E : Int64; }
 begin
   // Get current sample pointer
   FSampleS := ASample.GetSize;
@@ -694,8 +731,13 @@ begin
   FUpdateSample := True;
 
   // Paint window
-  Windows.GetClientRect(FWnd, R);
-  InvalidateRect(FWnd, @R, False);
+  if SettingDrawOnPaint then
+  begin
+    Windows.GetClientRect(FWnd, R);
+    InvalidateRect(FWnd, @R, False);
+  end
+  else
+    PaintVideoWindow;
 end;
 
 initialization
@@ -705,12 +747,24 @@ initialization
   FDC       := 0;
   FRC       := 0;
   FGLInited := False;
+  FOpenGLCaps := '';
+
+  FTextureTarget := 0;
+  FTextureDim := Rect(0,0,0,0);
 
   FNumTextures := 0;
   SetLength(FTextures, 0);
   FillChar(FTextureRect, SizeOf(FTextureRect), #0);
 
   FUpdateSample := False;
+  FReloadTextures := False;
+
+  FFrameDurCounter := nil;
+  FFpsCounter := 0;
+  FFrames := 0;
+  FFrameDrop := 0;
+  FFramesDropped := 0;
+  FFrameRate := 0;
 
   // Initialize sample variables
   WriteTrace('Clear data');
