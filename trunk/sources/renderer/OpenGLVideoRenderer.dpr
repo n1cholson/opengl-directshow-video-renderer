@@ -47,7 +47,8 @@ uses
   VideoRendererFilter in 'VideoRendererFilter.pas',
   VideoWindow in 'VideoWindow.pas',
   settings in 'settings.pas',
-  supports in 'supports.pas';
+  supports in 'supports.pas',
+  performancecounter in '..\units\performancecounter.pas';
 
 {$E ax}
 

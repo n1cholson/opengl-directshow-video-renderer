@@ -38,7 +38,8 @@ uses
   glsl,
   texture,
   supports,
-  settings;
+  settings,
+  performancecounter;
 
 type
   TFloatRect = record
@@ -51,6 +52,12 @@ var
   FWndClass : TWndClassEx;
   FWnd      : HWND;
   FDC       : HDC;
+  FFrameDurCounter  : TPerformanceCounter;
+  FFpsCounter : DWord;
+  FFrames : DWord;
+  FFrameDrop : Integer;
+  FFramesDropped : Integer;
+  FFrameRate : Double;
 
   // Sample variables
   FWidth    : Integer;
@@ -65,6 +72,7 @@ var
   FRC            : HGLRC;
   FGLInited      : Boolean;
   FNumTextures   : Integer;
+  FOpenGLCaps    : String;
   FTextures      : array of TTexture;
   FTextureRect   : TFloatRect;
   FUpdateSample  : Boolean;
@@ -171,13 +179,43 @@ end;
 function WndMessageProc(AhWnd: HWND; AMsg: UINT; AWParam: WPARAM; ALParam: LPARAM): UINT; stdcall;
 var
   PS : TPaintStruct;
+  FPS : Double;
 begin
   if AMsg = WM_PAINT then
   begin
     Result := 0;
+
+    if (FFrameDrop > 0) and (SettingEnableFrameDrop) then
+    begin
+      Inc(FFramesDropped);
+      Dec(FFrameDrop);
+      Exit;
+    end;
+    
+    if Assigned(FFrameDurCounter) then
+      FFrameDurCounter.Start;
+
     BeginPaint(FWnd, PS);
     PaintVideoWindow;
     EndPaint(FWnd, PS);
+    Inc(FFrames);
+
+    if Assigned(FFrameDurCounter) then
+      FFrameDurCounter.Stop;
+
+    // Frame drop
+    if Assigned(FFrameDurCounter) then
+      if FFrameDurCounter.Seconds > (1 / FFrameRate) then
+        Inc(FFrameDrop);
+
+    if (GetTickCount - FFpsCounter) > 1000 then
+    begin
+      // Display fps
+      Fps := (FFrames * 1000) / (GetTickCount - FFpsCounter);
+      SetWindowText(FWnd, PChar(Format('OpenGL Video Renderer (%s) Fps: %.2f, Framedrop: %d/%d',[FOpenGLCaps, Fps, FFrameDrop, FFramesDropped])));
+      FFpsCounter := GetTickCount;
+      FFrames := 0;
+    end;
   end
   else
     Result := DefWindowProc(AhWnd,AMsg,AwParam,AlParam);
@@ -189,6 +227,7 @@ var
   VIH2: PVideoInfoHeader2;
   MPG1: PMPEG1VideoInfo;
   MPG2: PMPEG2VideoInfo;
+  FrameTime : Double;
 begin
   WriteTrace('CreateVideoWindow.Enter');
   Result := False;
@@ -247,6 +286,12 @@ begin
   FSubType := AMediaType^.subtype;
   WriteTrace(Format('Using subtype: %s', [SGUIDToString(FSubType)]));
 
+  WriteTrace('Average frame time: ' + IntToStr(FFormat.AvgTimePerFrame));
+  FrameTime := FFormat.AvgTimePerFrame / 10000000;
+  WriteTrace('Frame time: ' + FloatToStr(FrameTime));
+  FFrameRate := 1.0 / FrameTime; 
+  WriteTrace('Frames rate: ' + FloatToStr(FFrameRate));
+
   // Create sample buffer
   FSampleS := 0;
   FSampleL := FWidth * FHeight * 4;
@@ -301,12 +346,21 @@ begin
   end;
   WriteTrace('Device context: ' + IntToStr(FDC));
 
+  // Create performance counter
+  WriteTrace('Initialize performance counters');
+  FFrameDurCounter := TPerformanceCounter.Create;
+
   WriteTrace('Create opengl');
   if not CreateOpenGL then
   begin
     WriteTrace('Could not create opengl!');
     Exit;
   end;
+
+  FFpsCounter := GetTickCount;
+  FFrames := 0;
+  FFrameDrop := 0;
+  FFramesDropped := 0;
 
   Result := True;
 
@@ -320,6 +374,14 @@ begin
   // Release opengl
   WriteTrace('Release opengl');
   ReleaseOpenGL;
+
+  // Release performance counter
+  WriteTrace('Release performance counter');
+  FFrameDurCounter.Free;
+
+  FFrames := 0;
+  FFrameDrop := 0;
+  FFrameRate := 0;
 
   // Release device context
   if (FDC <> 0) then
@@ -455,6 +517,7 @@ begin
 
   FGLInited := True;
   Result := True;
+  FOpenGLCaps := 'Software';
   WriteTrace('CreateOpenGL.Leave with result: ' + BoolToStr(Result));
 end;
 
@@ -463,6 +526,7 @@ var
   I : Integer;
 begin
   FGLInited := False;
+  FOpenGLCaps := '';
 
   // Release textures
   if FNumTextures > 0 then
