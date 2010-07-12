@@ -409,7 +409,7 @@ begin
 
   Result := True;
 
-  WriteTrace('CreateVideoWindow.Leave with result: ' + BoolToStr(Result));
+  WriteTrace('CreateVideoWindow.Leave with result: ' + BoolToStr(Result, True));
 end;
 
 procedure ReleaseVideoWindow;
@@ -509,6 +509,7 @@ begin
   WriteTrace('Opengl max texture units: ' + IntToStr(SupportMaxTextureUnits));
   WriteTrace('Opengl max texture size: ' + IntToStr(SupportMaxTextureSize));
   WriteTrace('Opengl non power of two supported: ' + BoolToStr(SupportNonPowerOfTwoTextures, True));
+  WriteTrace('Opengl glsl supported: ' + BoolToStr(SupportGLSL, True));
 
   // Get max texture units and check for at least 3
   if (SupportMaxTextureUnits < 0) then
@@ -526,9 +527,7 @@ begin
 
   if not SupportNonPowerOfTwoTextures then
   begin
-    WriteTrace('Calculate non power of two from size: ' + Format('%d x %d',[FWidth, FHeight]));
     NPOT := NonPowerOfTwo(FWidth, FHeight, SupportMaxTextureSize);
-    WriteTrace('Non-Power-Of-Two size: ' + Format('%d x %d',[NPOT.Right, NPOT.Bottom]));
     FTextureDim.Right := NPOT.Right;
     FTextureDim.Bottom := NPOT.Bottom;
     FTextureTarget := GL_TEXTURE_2D;
@@ -547,7 +546,7 @@ begin
   end;
 
   // Detect settings
-  SettingSoftwareColorConversion := not SupportGLSL;
+  SettingSoftwareColorConversion := True{not SupportGLSL};
   SettingEnableFrameDrop := True;
   SettingDrawOnPaint := True;
 
@@ -564,7 +563,7 @@ begin
   FGLInited := True;
   Result := True;
   FOpenGLCaps := 'Software';
-  WriteTrace('CreateOpenGL.Leave with result: ' + BoolToStr(Result));
+  WriteTrace('CreateOpenGL.Leave with result: ' + BoolToStr(Result, True));
 end;
 
 procedure ReleaseOpenGL;
@@ -661,7 +660,7 @@ begin
   end
   else
     WriteTrace('No window handle present!');
-  WriteTrace('SetVideoWindowOwner.Leave with result: ' + BoolToStr(Result));
+  WriteTrace('SetVideoWindowOwner.Leave with result: ' + BoolToStr(Result, True));
 end;
 
 function SetVideoWindowPosition(ALeft, ATop, AWidth, AHeight : Integer) : Boolean;
