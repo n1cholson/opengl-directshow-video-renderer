@@ -28,7 +28,7 @@
 { Version 1.0    Initial Release                                               }
 {==============================================================================}
 
-unit texture;
+unit GLTexture;
 
 {$ifdef FPC}
   {$mode objfpc}{$H+}

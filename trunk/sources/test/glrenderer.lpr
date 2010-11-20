@@ -12,7 +12,7 @@ uses
   LResources,
   dshowtypes,
   sampleloader,
-  glsldebugform, dglOpenGL, conversion, glsl, texture;
+  glsldebugform, dglOpenGL, OVRConversion, GLSL, GLTexture;
 
 {$IFDEF WINDOWS}{$R glrenderer.rc}{$ENDIF}
 

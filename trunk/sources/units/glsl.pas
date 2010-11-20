@@ -28,7 +28,7 @@
 { Version 1.0    Initial Release                                               }
 {==============================================================================}
 
-unit glsl;
+unit GLSL;
 
 {$ifdef FPC}
   {$mode objfpc}{$H+}

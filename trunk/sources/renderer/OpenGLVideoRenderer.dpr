@@ -33,22 +33,22 @@
 
 library OpenGLVideoRenderer;
 
-{$include videorenderer_compiler.inc}
+{$include OpenGLVideoRenderer_compilerflags.inc}
 
-{%File 'videorenderer_compiler.inc'}
+{%File 'OpenGLVideoRenderer_compilerflags.inc'}
 
 uses
   BaseClass,
-  utils in 'utils.pas',
-  texture in '..\units\texture.pas',
-  glsl in '..\units\glsl.pas',
-  conversion in '..\units\conversion.pas',
   dglOpenGL in '..\headers\dglOpenGL.pas',
-  VideoRendererFilter in 'VideoRendererFilter.pas',
-  VideoWindow in 'VideoWindow.pas',
-  settings in 'settings.pas',
-  supports in 'supports.pas',
-  performancecounter in '..\units\performancecounter.pas';
+  GLSL in '..\units\GLSL.pas',
+  GLTexture in '..\units\GLTexture.pas',
+  PerformanceCounter in '..\units\PerformanceCounter.pas',
+  OVRUtils in 'OVRUtils.pas',
+  OVRFilter in 'OVRFilter.pas',
+  OVRVideoWindow in 'OVRVideoWindow.pas',
+  OVRSettings in 'OVRSettings.pas',
+  OVRSupports in 'OVRSupports.pas',
+  OVRConversion in '..\units\OVRConversion.pas';
 
 {$E ax}
 

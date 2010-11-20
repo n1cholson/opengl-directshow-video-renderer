@@ -1,4 +1,4 @@
-unit VideoWindow;
+unit OVRVideoWindow;
 
 interface
 
@@ -33,13 +33,13 @@ uses
   Messages,
 
   // Own
-  utils,
-  conversion,
-  glsl,
-  texture,
-  supports,
-  settings,
-  performancecounter;
+  OVRUtils,
+  OVRConversion,
+  GLSL,
+  GLTexture,
+  OVRSupports,
+  OVRSettings,
+  PerformanceCounter;
 
 type
   TFloatRect = record
@@ -244,7 +244,7 @@ begin
   begin
     // Display fps
     Fps := (FFrames * 1000) / (GetTickCount - FFpsCounter);
-    SetWindowText(FWnd, PChar(Format('OpenGL Video Renderer (%s) Fps: %.2f, Framedrop: %d/%d',[FOpenGLCaps, Fps, FFrameDrop, FFramesDropped])));
+    //SetWindowText(FWnd, PChar(Format('OpenGL Video Renderer (%s) Fps: %.2f, Framedrop: %d/%d',[FOpenGLCaps, Fps, FFrameDrop, FFramesDropped])));
     FFpsCounter := GetTickCount;
     FFrames := 0;
   end;
@@ -366,7 +366,7 @@ begin
   FWnd := CreateWindow(
     FWndClass.lpszClassName,
     'OpenGL Video Renderer',
-    WS_CAPTION or WS_THICKFRAME,
+    WS_VISIBLE or WS_POPUP or WS_CLIPSIBLINGS or WS_CLIPCHILDREN,
     0, 0, 320, 240,
     0, 0, hInstance, nil
     );

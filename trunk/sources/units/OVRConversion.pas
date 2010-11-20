@@ -28,7 +28,7 @@
  { Version 1.0    Initial Release                                               }
  {==============================================================================}
 
-unit conversion;
+unit OVRConversion;
 
 {$ifdef FPC}
   {$mode objfpc}{$H+}
