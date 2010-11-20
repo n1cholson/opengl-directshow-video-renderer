@@ -28,14 +28,14 @@
 { Version 1.0    Initial Release                                               }
 {==============================================================================}
 
-unit utils;
+unit OVRUtils;
 
 interface
 
 uses
   Windows;
 
-{$include videorenderer_compiler.inc}
+{$include OpenGLVideoRenderer_compilerflags.inc}
 
 procedure WriteTrace(_Line : WideString);
 

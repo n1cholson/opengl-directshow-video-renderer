@@ -66,19 +66,19 @@
         <UnitName Value="dglOpenGL"/>
       </Unit5>
       <Unit6>
-        <Filename Value="..\units\conversion.pas"/>
+        <Filename Value="..\units\OVRConversion.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="conversion"/>
+        <UnitName Value="OVRConversion"/>
       </Unit6>
       <Unit7>
-        <Filename Value="..\units\glsl.pas"/>
+        <Filename Value="..\units\GLSL.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="glsl"/>
+        <UnitName Value="GLSL"/>
       </Unit7>
       <Unit8>
-        <Filename Value="..\units\texture.pas"/>
+        <Filename Value="..\units\GLTexture.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="texture"/>
+        <UnitName Value="GLTexture"/>
       </Unit8>
     </Units>
   </ProjectOptions>
@@ -87,7 +87,7 @@
     <PathDelim Value="\"/>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)\"/>
-      <OtherUnitFiles Value="C:\DevProjects\opengl directshow video renderer\sources\headers\;C:\DevProjects\opengl directshow video renderer\sources\units\"/>
+      <OtherUnitFiles Value="..\headers\;..\units\"/>
     </SearchPaths>
     <Linking>
       <Options>

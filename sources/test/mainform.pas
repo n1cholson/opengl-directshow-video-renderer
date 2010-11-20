@@ -19,16 +19,18 @@ uses
   Controls,
   Graphics,
   Dialogs,
-  ExtCtrls, ComCtrls, Menus,
+  ExtCtrls,
+  ComCtrls,
+  Menus,
   Windows,
 
   // 3rd party
   dglopengl,
 
   // Own
-  texture,
+  GLTexture,
   sampleloader,
-  glsl;
+  GLSL;
 
 type
   TFloatRect = record
@@ -103,7 +105,7 @@ var
 implementation
 
 uses
-  conversion, dshowtypes, glsldebugform;
+  OVRConversion, dshowtypes, glsldebugform;
 
 function FloatRect(ALeft, ATop, ARight, ABottom : Single) : TFloatRect;
 begin

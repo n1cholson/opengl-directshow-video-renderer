@@ -1,4 +1,4 @@
-unit settings;
+unit OVRSettings;
 
 interface
 

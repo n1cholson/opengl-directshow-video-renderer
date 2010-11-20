@@ -31,7 +31,7 @@
 { Version 1.0    Initial Release                                               }
 {==============================================================================}
 
-unit VideoRendererFilter;
+unit OVRFilter;
 
 interface
 
@@ -52,7 +52,7 @@ const
   CLSID_OpenGLVideoRenderer: TGUID = '{5BA04474-46C4-4802-B52F-3EA19B75B227}';
 
 type
-  TVideoRendererFilter = class(TBCBaseRenderer, IPersist, IDispatch,
+  TOVRFilter = class(TBCBaseRenderer, IPersist, IDispatch,
                                IBasicVideo, IBasicVideo2,
                                IAMFilterMiscFlags,
                                IVideoWindow)
@@ -158,8 +158,8 @@ implementation
 
 uses
   // Own
-  Utils,
-  videowindow;
+  OVRUtils,
+  OVRVideoWindow;
 
 var
   SupportedSubTypes : array of TGUID;
@@ -202,7 +202,7 @@ begin
   end;
 end;
 
-constructor TVideoRendererFilter.Create(ObjName: String; Unk: IUnknown;
+constructor TOVRFilter.Create(ObjName: String; Unk: IUnknown;
   out hr: HResult);
 begin
   WriteTrace('Create.Enter');
@@ -217,7 +217,7 @@ begin
   WriteTrace('Create.Leave');
 end;
 
-constructor TVideoRendererFilter.CreateFromFactory(Factory: TBCClassFactory;
+constructor TOVRFilter.CreateFromFactory(Factory: TBCClassFactory;
   const Controller: IUnknown);
 var
   hr: HRESULT;
@@ -227,7 +227,7 @@ begin
   WriteTrace('CreateFromFactory.Leave');
 end;
 
-destructor TVideoRendererFilter.Destroy;
+destructor TOVRFilter.Destroy;
 begin
   WriteTrace('Destroy.Enter');
 
@@ -248,14 +248,14 @@ begin
   WriteTrace('Destroy.Leave');
 end;
 
-function TVideoRendererFilter.NotImplemented : HResult;
+function TOVRFilter.NotImplemented : HResult;
 begin
   Result := E_POINTER;
   if not CheckConnected(FInputPin,Result) then Exit;
   Result := E_NOTIMPL;
 end;
 
-function TVideoRendererFilter.Active: HResult;
+function TOVRFilter.Active: HResult;
 begin
   WriteTrace('Active.Enter');
   WriteTrace('Show video window');
@@ -265,7 +265,7 @@ begin
   WriteTrace('Active.Leave with result: ' + IntToStr(Result));
 end;
 
-function TVideoRendererFilter.Inactive: HResult;
+function TOVRFilter.Inactive: HResult;
 begin
   WriteTrace('Inactive.Enter');
   WriteTrace('Hide video window');
@@ -275,7 +275,7 @@ begin
   WriteTrace('Inactive.Leave with result: ' + IntToStr(Result));
 end;
 
-function TVideoRendererFilter.CheckMediaType(MediaType: PAMMediaType): HResult;
+function TOVRFilter.CheckMediaType(MediaType: PAMMediaType): HResult;
 begin
   WriteTrace('CheckMediaType.Enter');
 
@@ -318,7 +318,7 @@ begin
   Result := NOERROR;
 end;
 
-function TVideoRendererFilter.DoRenderSample(MediaSample: IMediaSample): HResult;
+function TOVRFilter.DoRenderSample(MediaSample: IMediaSample): HResult;
 begin
   // No mediatype, exit with pointer error
   if (MediaSample = nil) then
@@ -331,7 +331,7 @@ begin
   Result := NOERROR;
 end;
 
-function TVideoRendererFilter.SetMediaType(MediaType: PAMMediaType): HResult;
+function TOVRFilter.SetMediaType(MediaType: PAMMediaType): HResult;
 begin
   WriteTrace('SetMediaType.Enter');
 
@@ -365,22 +365,22 @@ begin
 end;
 
 {*** IDispatch methods *** taken from CBaseVideoWindow *** ctlutil.cpp ********}
-function TVideoRendererFilter.GetTypeInfoCount(out Count: Integer): HResult; stdcall;
+function TOVRFilter.GetTypeInfoCount(out Count: Integer): HResult; stdcall;
 begin
   Result := fDispatch.GetTypeInfoCount(Count);
 end;
 
-function TVideoRendererFilter.GetTypeInfo(Index, LocaleID: Integer; out TypeInfo): HResult; stdcall;
+function TOVRFilter.GetTypeInfo(Index, LocaleID: Integer; out TypeInfo): HResult; stdcall;
 begin
   Result := fDispatch.GetTypeInfo(IID_IVideoWindow,Index,LocaleID,TypeInfo);
 end;
 
-function TVideoRendererFilter.GetIDsOfNames(const IID: TGUID; Names: Pointer; NameCount, LocaleID: Integer; DispIDs: Pointer): HResult; stdcall;
+function TOVRFilter.GetIDsOfNames(const IID: TGUID; Names: Pointer; NameCount, LocaleID: Integer; DispIDs: Pointer): HResult; stdcall;
 begin
   Result := fDispatch.GetIDsOfNames(IID_IVideoWindow,Names,NameCount,LocaleID,DispIDs);
 end;
 
-function TVideoRendererFilter.Invoke(DispID: Integer; const IID: TGUID; LocaleID: Integer; Flags: Word; var Params; VarResult, ExcepInfo, ArgErr: Pointer): HResult; stdcall;
+function TOVRFilter.Invoke(DispID: Integer; const IID: TGUID; LocaleID: Integer; Flags: Word; var Params; VarResult, ExcepInfo, ArgErr: Pointer): HResult; stdcall;
 var
   pti : ITypeInfo;
 begin
@@ -400,152 +400,152 @@ begin
 end;
 
 (*** IBasicVideo methods ******************************************************)
-function TVideoRendererFilter.get_AvgTimePerFrame(out pAvgTimePerFrame: TRefTime): HResult; stdcall;
+function TOVRFilter.get_AvgTimePerFrame(out pAvgTimePerFrame: TRefTime): HResult; stdcall;
 begin
   if not CheckConnected(FInputPin, Result) then Exit;
   pAvgTimePerFrame := VideoWindowFormat.AvgTimePerFrame;
   Result := NOERROR;
 end;
 
-function TVideoRendererFilter.get_BitRate(out pBitRate: Longint): HResult; stdcall;
+function TOVRFilter.get_BitRate(out pBitRate: Longint): HResult; stdcall;
 begin
   if not CheckConnected(FInputPin,Result) then Exit;
   pBitRate := VideoWindowFormat.dwBitRate;
   Result := NOERROR;
 end;
 
-function TVideoRendererFilter.get_BitErrorRate(out pBitErrorRate: Longint): HResult; stdcall;
+function TOVRFilter.get_BitErrorRate(out pBitErrorRate: Longint): HResult; stdcall;
 begin
   if not CheckConnected(FInputPin,Result) then Exit;
   pBitErrorRate := VideoWindowFormat.dwBitErrorRate;
   Result := NOERROR;
 end;
 
-function TVideoRendererFilter.get_VideoWidth(out pVideoWidth: Longint): HResult; stdcall;
+function TOVRFilter.get_VideoWidth(out pVideoWidth: Longint): HResult; stdcall;
 begin
   if not CheckConnected(FInputPin,Result) then Exit;
   pVideoWidth := VideoWindowFormat.bmiHeader.biWidth;
   Result := NOERROR;
 end;
 
-function TVideoRendererFilter.get_VideoHeight(out pVideoHeight: Longint): HResult; stdcall;
+function TOVRFilter.get_VideoHeight(out pVideoHeight: Longint): HResult; stdcall;
 begin
   if not CheckConnected(FInputPin,Result) then Exit;
   pVideoHeight := VideoWindowFormat.bmiHeader.biHeight;
   Result := NOERROR;
 end;
 
-function TVideoRendererFilter.put_SourceLeft(SourceLeft: Longint): HResult; stdcall;
+function TOVRFilter.put_SourceLeft(SourceLeft: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.get_SourceLeft(out pSourceLeft: Longint): HResult; stdcall;
+function TOVRFilter.get_SourceLeft(out pSourceLeft: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.put_SourceWidth(SourceWidth: Longint): HResult; stdcall;
+function TOVRFilter.put_SourceWidth(SourceWidth: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.get_SourceWidth(out pSourceWidth: Longint): HResult; stdcall;
+function TOVRFilter.get_SourceWidth(out pSourceWidth: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.put_SourceTop(SourceTop: Longint): HResult; stdcall;
+function TOVRFilter.put_SourceTop(SourceTop: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.get_SourceTop(out pSourceTop: Longint): HResult; stdcall;
+function TOVRFilter.get_SourceTop(out pSourceTop: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.put_SourceHeight(SourceHeight: Longint): HResult; stdcall;
+function TOVRFilter.put_SourceHeight(SourceHeight: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.get_SourceHeight(out pSourceHeight: Longint): HResult; stdcall;
+function TOVRFilter.get_SourceHeight(out pSourceHeight: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.put_DestinationLeft(DestinationLeft: Longint): HResult; stdcall;
+function TOVRFilter.put_DestinationLeft(DestinationLeft: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.get_DestinationLeft(out pDestinationLeft: Longint): HResult; stdcall;
+function TOVRFilter.get_DestinationLeft(out pDestinationLeft: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.put_DestinationWidth(DestinationWidth: Longint): HResult; stdcall;
+function TOVRFilter.put_DestinationWidth(DestinationWidth: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.get_DestinationWidth(out pDestinationWidth: Longint): HResult; stdcall;
+function TOVRFilter.get_DestinationWidth(out pDestinationWidth: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.put_DestinationTop(DestinationTop: Longint): HResult; stdcall;
+function TOVRFilter.put_DestinationTop(DestinationTop: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.get_DestinationTop(out pDestinationTop: Longint): HResult; stdcall;
+function TOVRFilter.get_DestinationTop(out pDestinationTop: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.put_DestinationHeight(DestinationHeight: Longint): HResult; stdcall;
+function TOVRFilter.put_DestinationHeight(DestinationHeight: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.get_DestinationHeight(out pDestinationHeight: Longint): HResult; stdcall;
+function TOVRFilter.get_DestinationHeight(out pDestinationHeight: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.SetSourcePosition(Left, Top, Width, Height: Longint): HResult; stdcall;
+function TOVRFilter.SetSourcePosition(Left, Top, Width, Height: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.GetSourcePosition(out pLeft, pTop, pWidth, pHeight: Longint): HResult; stdcall;
+function TOVRFilter.GetSourcePosition(out pLeft, pTop, pWidth, pHeight: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.SetDefaultSourcePosition: HResult; stdcall;
+function TOVRFilter.SetDefaultSourcePosition: HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.SetDestinationPosition(Left, Top, Width, Height: Longint): HResult; stdcall;
+function TOVRFilter.SetDestinationPosition(Left, Top, Width, Height: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.GetDestinationPosition(out pLeft, pTop, pWidth, pHeight: Longint): HResult; stdcall;
+function TOVRFilter.GetDestinationPosition(out pLeft, pTop, pWidth, pHeight: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.SetDefaultDestinationPosition: HResult; stdcall;
+function TOVRFilter.SetDefaultDestinationPosition: HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.GetVideoSize(out pWidth, pHeight: Longint): HResult; stdcall;
+function TOVRFilter.GetVideoSize(out pWidth, pHeight: Longint): HResult; stdcall;
 begin
   if not CheckConnected(FInputPin,Result) then Exit;
   pWidth := VideoWindowFormat.bmiHeader.biWidth;
@@ -553,100 +553,100 @@ begin
   Result := NOERROR;
 end;
 
-function TVideoRendererFilter.GetVideoPaletteEntries(StartIndex, Entries: Longint; out pRetrieved: Longint; out pPalette): HResult; stdcall;
+function TOVRFilter.GetVideoPaletteEntries(StartIndex, Entries: Longint; out pRetrieved: Longint; out pPalette): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.GetCurrentImage(var BufferSize: Longint; var pDIBImage): HResult; stdcall;
+function TOVRFilter.GetCurrentImage(var BufferSize: Longint; var pDIBImage): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.IsUsingDefaultSource: HResult; stdcall;
+function TOVRFilter.IsUsingDefaultSource: HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.IsUsingDefaultDestination: HResult; stdcall;
+function TOVRFilter.IsUsingDefaultDestination: HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
 (*** IBasicVideo2 methods *****************************************************)
-function TVideoRendererFilter.GetPreferredAspectRatio(out plAspectX, plAspectY: Longint): HResult; stdcall;
+function TOVRFilter.GetPreferredAspectRatio(out plAspectX, plAspectY: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
 (*** IAMFilterMiscFlags methods ***********************************************)
-function TVideoRendererFilter.GetMiscFlags: ULONG; stdcall;
+function TOVRFilter.GetMiscFlags: ULONG; stdcall;
 begin
   Result := AM_FILTER_MISC_FLAGS_IS_RENDERER;
 end;
 
 (*** IVideoWindow methods *****************************************************)
-function TVideoRendererFilter.put_Caption(strCaption: WideString): HResult; stdcall;
+function TOVRFilter.put_Caption(strCaption: WideString): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.get_Caption(out strCaption: WideString): HResult; stdcall;
+function TOVRFilter.get_Caption(out strCaption: WideString): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.put_WindowStyle(WindowStyle: Longint): HResult; stdcall;
+function TOVRFilter.put_WindowStyle(WindowStyle: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.get_WindowStyle(out WindowStyle: Longint): HResult; stdcall;
+function TOVRFilter.get_WindowStyle(out WindowStyle: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.put_WindowStyleEx(WindowStyleEx: Longint): HResult; stdcall;
+function TOVRFilter.put_WindowStyleEx(WindowStyleEx: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.get_WindowStyleEx(out WindowStyleEx: Longint): HResult; stdcall;
+function TOVRFilter.get_WindowStyleEx(out WindowStyleEx: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.put_AutoShow(AutoShow: LongBool): HResult; stdcall;
+function TOVRFilter.put_AutoShow(AutoShow: LongBool): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.get_AutoShow(out AutoShow: LongBool): HResult; stdcall;
+function TOVRFilter.get_AutoShow(out AutoShow: LongBool): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.put_WindowState(WindowState: Longint): HResult; stdcall;
+function TOVRFilter.put_WindowState(WindowState: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.get_WindowState(out WindowState: Longint): HResult; stdcall;
+function TOVRFilter.get_WindowState(out WindowState: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.put_BackgroundPalette(BackgroundPalette: Longint): HResult; stdcall;
+function TOVRFilter.put_BackgroundPalette(BackgroundPalette: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.get_BackgroundPalette(out pBackgroundPalette: Longint): HResult; stdcall;
+function TOVRFilter.get_BackgroundPalette(out pBackgroundPalette: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.put_Visible(Visible: LongBool): HResult; stdcall;
+function TOVRFilter.put_Visible(Visible: LongBool): HResult; stdcall;
 begin
   if not SetVideoWindowVisible(Visible) then
   begin
@@ -656,53 +656,53 @@ begin
   Result := NOERROR;
 end;
 
-function TVideoRendererFilter.get_Visible(out pVisible: LongBool): HResult; stdcall;
+function TOVRFilter.get_Visible(out pVisible: LongBool): HResult; stdcall;
 begin
   pVisible := GetVideoWindowVisible;
   Result := NOERROR;
 end;
 
-function TVideoRendererFilter.put_Left(Left: Longint): HResult; stdcall;
+function TOVRFilter.put_Left(Left: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.get_Left(out pLeft: Longint): HResult; stdcall;
+function TOVRFilter.get_Left(out pLeft: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.put_Width(Width: Longint): HResult; stdcall;
+function TOVRFilter.put_Width(Width: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.get_Width(out pWidth: Longint): HResult; stdcall;
+function TOVRFilter.get_Width(out pWidth: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.put_Top(Top: Longint): HResult; stdcall;
+function TOVRFilter.put_Top(Top: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.get_Top(out pTop: Longint): HResult; stdcall;
+function TOVRFilter.get_Top(out pTop: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.put_Height(Height: Longint): HResult; stdcall;
+function TOVRFilter.put_Height(Height: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.get_Height(out pHeight: Longint): HResult; stdcall;
+function TOVRFilter.get_Height(out pHeight: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.put_Owner(Owner: OAHWND): HResult; stdcall;
+function TOVRFilter.put_Owner(Owner: OAHWND): HResult; stdcall;
 begin
   if not SetVideoWindowOwner(Owner) then
   begin
@@ -712,7 +712,7 @@ begin
   Result := NOERROR;
 end;
 
-function TVideoRendererFilter.get_Owner(out Owner: OAHWND): HResult; stdcall;
+function TOVRFilter.get_Owner(out Owner: OAHWND): HResult; stdcall;
 var
   O : HWND;
 begin
@@ -726,47 +726,47 @@ begin
   Result := NOERROR;
 end;
 
-function TVideoRendererFilter.put_MessageDrain(Drain: OAHWND): HResult; stdcall;
+function TOVRFilter.put_MessageDrain(Drain: OAHWND): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.get_MessageDrain(out Drain: OAHWND): HResult; stdcall;
+function TOVRFilter.get_MessageDrain(out Drain: OAHWND): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.get_BorderColor(out Color: Longint): HResult; stdcall;
+function TOVRFilter.get_BorderColor(out Color: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.put_BorderColor(Color: Longint): HResult; stdcall;
+function TOVRFilter.put_BorderColor(Color: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.get_FullScreenMode(out FullScreenMode: LongBool): HResult; stdcall;
+function TOVRFilter.get_FullScreenMode(out FullScreenMode: LongBool): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.put_FullScreenMode(FullScreenMode: LongBool): HResult; stdcall;
+function TOVRFilter.put_FullScreenMode(FullScreenMode: LongBool): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.SetWindowForeground(Focus: Longint): HResult; stdcall;
+function TOVRFilter.SetWindowForeground(Focus: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.NotifyOwnerMessage(hwnd: Longint; uMsg, wParam, lParam: Longint): HResult; stdcall;
+function TOVRFilter.NotifyOwnerMessage(hwnd: Longint; uMsg, wParam, lParam: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.SetWindowPosition(Left, Top, Width, Height: Longint): HResult; stdcall;
+function TOVRFilter.SetWindowPosition(Left, Top, Width, Height: Longint): HResult; stdcall;
 begin
   if not SetVideoWindowPosition(Left, Top, Width, Height) then
   begin
@@ -776,32 +776,32 @@ begin
   Result := NOERROR;
 end;
 
-function TVideoRendererFilter.GetWindowPosition(out pLeft, pTop, pWidth, pHeight: Longint): HResult; stdcall;
+function TOVRFilter.GetWindowPosition(out pLeft, pTop, pWidth, pHeight: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.GetMinIdealImageSize(out pWidth, pHeight: Longint): HResult; stdcall;
+function TOVRFilter.GetMinIdealImageSize(out pWidth, pHeight: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.GetMaxIdealImageSize(out pWidth, pHeight: Longint): HResult; stdcall;
+function TOVRFilter.GetMaxIdealImageSize(out pWidth, pHeight: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.GetRestorePosition(out pLeft, pTop, pWidth, pHeight: Longint): HResult; stdcall;
+function TOVRFilter.GetRestorePosition(out pLeft, pTop, pWidth, pHeight: Longint): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.HideCursor(HideCursor: LongBool): HResult; stdcall;
+function TOVRFilter.HideCursor(HideCursor: LongBool): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
 
-function TVideoRendererFilter.IsCursorHidden(out CursorHidden: LongBool): HResult; stdcall;
+function TOVRFilter.IsCursorHidden(out CursorHidden: LongBool): HResult; stdcall;
 begin
   Result := NotImplemented();
 end;
@@ -824,7 +824,7 @@ initialization
   SupportedFormatTypes[2] := FORMAT_MPEGVideo;
   SupportedFormatTypes[3] := FORMAT_MPEG2Video;
 
-  TBCClassFactory.CreateFilter(TVideoRendererFilter, 'OpenGLVideoRenderer',
+  TBCClassFactory.CreateFilter(TOVRFilter, 'OpenGLVideoRenderer',
     CLSID_OpenGLVideoRenderer, CLSID_LegacyAmFilterCategory, MERIT_DO_NOT_USE,
     0, nil
     );

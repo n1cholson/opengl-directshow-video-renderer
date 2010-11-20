@@ -1,4 +1,4 @@
-unit performancecounter;
+unit PerformanceCounter;
 
 interface
 
